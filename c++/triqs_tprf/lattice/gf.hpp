@@ -40,8 +40,8 @@ namespace triqs_tprf {
   @param e_k discretized lattice dispersion :math:`\epsilon_{\bar{a}b}(\mathbf{k})`
   @param mesh imaginary frequency mesh
   @return Matsubara frequency lattice Green's function $G^{(0)}_{a\bar{b}}(i\omega_n, \mathbf{k})$
-*/
-  g_wk_t lattice_dyson_g0_wk(double mu, e_k_cvt e_k, gf_mesh<imfreq> mesh);
+  */
+  g_wk_t lattice_dyson_g0_wk(double mu, e_k_cvt e_k, mesh::imfreq mesh);
 
   /** Construct an interacting Matsubara frequency lattice Green's function :math:`G_{a\bar{b}}(i\omega_n, \mathbf{k})`
    
@@ -81,7 +81,7 @@ namespace triqs_tprf {
   @param delta broadening :math:`\delta`
   @return Matsubara frequency lattice Green's function $G^{(0)}_{a\bar{b}}(\omega, \mathbf{k})$
 */
-  g_fk_t lattice_dyson_g0_fk(double mu, e_k_cvt e_k, gf_mesh<refreq> mesh, double delta);
+  g_fk_t lattice_dyson_g0_fk(double mu, e_k_cvt e_k, mesh::refreq mesh, double delta);
 
   /** Construct an interacting Matsubara frequency lattice Green's function :math:`G_{a\bar{b}}(i\omega_n, \mathbf{k})`
    

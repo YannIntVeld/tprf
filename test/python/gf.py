@@ -8,7 +8,7 @@ import numpy as np
 from triqs_tprf.tight_binding import TBLattice
 
 from triqs_tprf.lattice import lattice_dyson_g0_wk, lattice_dyson_g0_fk
-from triqs_tprf.lattice import lattice_dyson_g_wk, lattice_dyson_g_fk
+from triqs_tprf.lattice import lattice_dyson_g_wk, lattice_dyson_g_fk, lattice_dyson_g_w
 
 from triqs_tprf.gw import lindhard_chi00
 from triqs_tprf.gw import bubble_PI_wk
@@ -64,9 +64,13 @@ def test_gf_Matsubara():
     PI_wk = bubble_PI_wk(g0_wk)
     W_wk = dynamical_screened_interaction_W(PI_wk, V_k)
     sigma_wk = gw_sigma(W_wk, g0_wk)
+    
+    # Construct a kmesh-independent self-energy
+    sigma_w = Gf(mesh=wmesh, target_shape=[norb]*2)
+    sigma_w.data[:] = sigma_wk.data[:,0]
 
-    # Test setup dressed Gf
-    print("  -> dressed Matsubara Gf")
+    # lattice_dyson_g_wk, input sigma_wk
+    print("  -> lattice_dyson_g_wk, sigma_wk")
     g_wk = lattice_dyson_g_wk(mu=mu, e_k=e_k, sigma_wk=sigma_wk)
     g_wk_ref = Gf(mesh=MeshProduct(wmesh, kmesh), target_shape=[norb]*2)
     for w in wmesh:
@@ -75,7 +79,29 @@ def test_gf_Matsubara():
     
     np.testing.assert_array_almost_equal(g_wk.data[:], g_wk_ref.data[:])
 
+    # lattice_dyson_g_wk, input sigma_w
+    print("  -> lattice_dyson_g_wk, sigma_w")
+    g_wk_2 = lattice_dyson_g_wk(mu=mu, e_k=e_k, sigma_w=sigma_w)
+    g_wk_2_ref = Gf(mesh=MeshProduct(wmesh, kmesh), target_shape=[norb]*2)
+    for w in wmesh:
+        for k in kmesh:
+            g_wk_2_ref[w,k] = np.linalg.inv( (w.value + mu)*np.eye(norb) - e_k[k] - sigma_w[w] )
     
+    np.testing.assert_array_almost_equal(g_wk_2.data[:], g_wk_2_ref.data[:])
+
+    # lattice_dyson_g_w, input sigma_w
+    print("  -> lattice_dyson_g_w, sigma_w")
+    g_w = lattice_dyson_g_w(mu=mu, e_k=e_k, sigma_w=sigma_w)
+    
+    g_w_ref = Gf(mesh=wmesh, target_shape=[norb]*2)
+    g_w_ref.data[:] = 0.0
+    for w in wmesh:
+        wi = w.linear_index
+        for k in kmesh:
+            g_w_ref.data[wi,:] += np.linalg.inv( (w.value + mu)*np.eye(norb) - e_k[k] - sigma_w[w] )
+        # g_w_ref.data[wi,:] += np.sum(g_wk_2_ref.data[wi,:], axis=0)
+    g_w_ref.data[:] /= len(kmesh)
+    np.testing.assert_array_almost_equal(g_w.data[:], g_w_ref.data[:])
 
 
 def test_gf_realfreq():
@@ -140,7 +166,3 @@ def test_gf_realfreq():
 if __name__ == "__main__":
     test_gf_Matsubara()
     test_gf_realfreq()
-
-
-
-
