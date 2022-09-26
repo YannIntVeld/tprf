@@ -390,6 +390,9 @@ Returns
 out
      real frequency generalized Lindhard susceptibility in the particle-hole channel :math:`\chi^{(00)}_{\bar{a}b\bar{c}d}(\omega, \mathbf{q})`""")
 
+
+module.add_function ("triqs_tprf::chi_fk_t triqs_tprf::lindhard_chi00 (triqs_tprf::e_k_cvt e_k, gf_mesh<triqs::mesh::refreq> mesh, double beta, double mu, double delta, gf_mesh<brzone> outerkmesh)", doc = r"""""")
+
 module.add_function ("triqs_tprf::chi_wk_t triqs_tprf::solve_rpa_PH (triqs_tprf::chi_wk_vt chi0, array_contiguous_view<std::complex<double>, 4> U)", doc = r"""Random Phase Approximation (RPA) in the particle-hole channel
 
      Computes the equation

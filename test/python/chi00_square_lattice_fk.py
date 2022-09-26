@@ -22,7 +22,7 @@ def test_square_lattice_chi00_realfreq():
     # ------------------------------------------------------------------
     # -- Discretizations
     
-    n_k = (2, 2, 1)
+    n_k = 2
     nw_g = 3
     wmin = -5.0
     wmax = 5.0
@@ -64,7 +64,7 @@ def test_square_lattice_chi00_realfreq():
         orbital_names = ['up_0', 'do_0'],
         )
 
-    kmesh = t_r.get_kmesh(n_k)
+    kmesh = t_r.get_kmesh((n_k, n_k, 1))
     e_k = t_r.fourier(kmesh)
 
     fmesh = MeshReFreq(wmin, wmax, nw_g)
@@ -98,7 +98,24 @@ def test_square_lattice_chi00_realfreq():
     # -- compare at zero freq.
    
     np.testing.assert_array_almost_equal(
-        chi00_f0k.data, chi00_w0k.data, decimal=5)
+        chi00_f0k.data, chi00_w0k.data, decimal=4)
+
+    
+    # ------------------------------------------------------------------
+    # -- chi00 with a mask
+    
+    print('--> chi00_fk with mask')
+    outerkmesh = t_r.get_kmesh((n_k, 1, 1))
+    chi00_fk_withMask = lindhard_chi00(e_k=e_k, mesh=fmesh, beta=beta, mu=mu, delta=delta, outerkmesh=outerkmesh)
+
+    karr = np.array(list(kmesh.values()))
+    kx_ind = np.where( np.isclose(karr[:,1], 0.0) )[0]
+
+    assert np.allclose( karr[kx_ind,1], 0.0) 
+    np.testing.assert_array_almost_equal(
+        chi00_fk_analytic.data[:,kx_ind,:], chi00_fk_withMask.data)
+
+
 
 # ----------------------------------------------------------------------
 if __name__ == '__main__':

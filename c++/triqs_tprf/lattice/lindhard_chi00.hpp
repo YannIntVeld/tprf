@@ -134,4 +134,17 @@ namespace triqs_tprf {
 */
   chi_fk_t lindhard_chi00(e_k_cvt e_k, gf_mesh<refreq> mesh, double beta, double mu, double delta);
 
+  
+  /** Generalized Lindhard susceptibility in the particle-hole channel and for real frequencies :math:`\chi^{(00)}_{\bar{a}b\bar{c}d}(\omega, \mathbf{q})`, using a generic outer kmesh.
+
+    @param e_k discretized lattice dispersion :math:`\epsilon_{\bar{a}b}(\mathbf{k})`
+    @param mesh real frequency mesh 
+    @param beta inverse temperature
+    @param mu chemical potential :math:`\mu`
+    @param delta broadening :math:`\delta`
+    @param outerkmesh the outer qmesh
+    @return real frequency generalized Lindhard susceptibility in the particle-hole channel :math:`\chi^{(00)}_{\bar{a}b\bar{c}d}(\omega, \mathbf{q})`
+*/
+  chi_fk_t lindhard_chi00(e_k_cvt e_k, gf_mesh<refreq> mesh, double beta, double mu, double delta, gf_mesh<brzone> outerkmesh);
+
 } // namespace triqs_tprf

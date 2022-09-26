@@ -101,13 +101,13 @@ namespace triqs_tprf {
   // ----------------------------------------------------
   // chi00 bubble in analytic form in real frequencies
 
-  chi_fk_t lindhard_chi00(e_k_cvt e_k, gf_mesh<refreq> mesh, double beta, double mu, double delta) {
+  chi_fk_t lindhard_chi00(e_k_cvt e_k, gf_mesh<refreq> mesh, double beta, double mu, double delta, gf_mesh<brzone> outerkmesh) {
 
     auto fmesh = mesh;
     auto kmesh = e_k.mesh();
     int nb     = e_k.target().shape()[0];
 
-    chi_fk_t chi_fk{{mesh, kmesh}, {nb, nb, nb, nb}};
+    chi_fk_t chi_fk{{mesh, outerkmesh}, {nb, nb, nb, nb}};
 
     for (auto const &[f, k] : chi_fk.mesh()) chi_fk[f, k] = 0.;
 
@@ -116,9 +116,9 @@ namespace triqs_tprf {
     auto arr = mpi_view(kmesh);
 
 #pragma omp parallel for
-    for (int qidx = 0; qidx < kmesh.size(); qidx++) {
+    for (int qidx = 0; qidx < outerkmesh.size(); qidx++) {
 
-      auto q_iter = kmesh.begin();
+      auto q_iter = outerkmesh.begin();
       q_iter += qidx;
       auto q = *q_iter;
 
@@ -158,6 +158,11 @@ namespace triqs_tprf {
     chi_fk /= kmesh.size();
 
     return chi_fk;
+  }
+
+
+  chi_fk_t lindhard_chi00(e_k_cvt e_k, gf_mesh<refreq> mesh, double beta, double mu, double delta) {
+    return lindhard_chi00(e_k, mesh, beta, mu, delta, e_k.mesh());
   }
 
 } // namespace triqs_tprf
