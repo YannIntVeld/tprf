@@ -66,7 +66,19 @@ def test_gw_self_energy_real_freq():
     
     # Check if sigma_fk and sigma_k are the same at w->inf
     np.testing.assert_array_almost_equal(sigma_fk.data[-1,:], sigma_k.data[:], decimal=4)
-    
+   
+
+    print('--> gw_self_energy with a mask')
+    kmask = np.zeros(len(kmesh), dtype=bool)
+    kmask[:] = False
+    kmask[0] = True
+    fmask = np.zeros(len(fmesh), dtype=bool)
+    fmask[:] = True
+    sigma_fk_masked = g0w_sigma(mu=mu, beta=beta, e_k=e_k, W_fk=Wr_fk, v_k=V_k, delta=delta, kmask=kmask, fmask=fmask)
+
+    np.testing.assert_array_almost_equal(sigma_fk.data[:,0,:], sigma_fk_masked.data[:,0,:], decimal=4)
+    np.testing.assert_array_almost_equal(sigma_fk_masked.data[:,1:,:], np.zeros_like(sigma_fk_masked.data[:,1:,:]), decimal=10)
+
     print('--> lattice_dyson_g_wk')
     g_fk = lattice_dyson_g_fk(mu, e_k, sigma_fk, delta)
 

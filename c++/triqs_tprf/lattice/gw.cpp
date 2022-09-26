@@ -129,7 +129,7 @@ namespace triqs_tprf {
   // ----------------------------------------------------
   // g0w_sigma via spectral representation
 
-  g_fk_t g0w_sigma(double mu, double beta, e_k_cvt e_k, chi_fk_cvt W_fk, chi_k_cvt v_k, double delta) {
+  g_fk_t g0w_sigma(double mu, double beta, e_k_cvt e_k, chi_fk_cvt W_fk, chi_k_cvt v_k, double delta, nda::vector<bool> kmask, nda::vector<bool> fmask) {
 
   if (std::get<1>(W_fk.mesh()) != e_k.mesh()) TRIQS_RUNTIME_ERROR << "g0w_sigma: k-space meshes are not the same.\n";
   if (e_k.mesh() != v_k.mesh()) TRIQS_RUNTIME_ERROR << "g0w_sigma: k-space meshes are not the same.\n";
@@ -156,6 +156,10 @@ namespace triqs_tprf {
 #pragma omp parallel for shared(sigma_fk)
   for (unsigned int kidx = 0; kidx < arr.size(); kidx++) {
     auto &k = arr(kidx);
+    if(kmask.size() > 1){
+      int ind = kmesh.index_to_linear(k.index()); 
+      if(!kmask[ind]) continue;
+    }
 
     for (auto const &q : kmesh) {
 
@@ -167,6 +171,11 @@ namespace triqs_tprf {
       for (int l : range(nb)) {
 
         for (auto const &f : fmesh) {
+
+          if(fmask.size() > 1){
+            int ind = fmesh.index_to_linear(f.index()); 
+            if(!fmask[ind]) continue;
+          }
 
           for (auto const &fp : fmesh) {
 
@@ -186,6 +195,12 @@ namespace triqs_tprf {
   sigma_fk = mpi::all_reduce(sigma_fk);
   return sigma_fk;
   }
+
+  g_fk_t g0w_sigma(double mu, double beta, e_k_cvt e_k, chi_fk_cvt W_fk, chi_k_cvt v_k, double delta) {
+    nda::vector<bool> mask = {true};
+    return g0w_sigma(mu, beta, e_k, W_fk, v_k, delta, mask, mask);
+  }
+
 
   e_k_t g0w_sigma(double mu, double beta, e_k_cvt e_k, chi_k_cvt v_k) {
 
