@@ -74,10 +74,25 @@ def test_gw_self_energy_real_freq():
     kmask[0] = True
     fmask = np.zeros(len(fmesh), dtype=bool)
     fmask[:] = True
-    sigma_fk_masked = g0w_sigma(mu=mu, beta=beta, e_k=e_k, W_fk=Wr_fk, v_k=V_k, delta=delta, kmask=kmask, fmask=fmask)
+    sigma_fk_masked = g0w_sigma(mu=mu, beta=beta, e_k=e_k, W_fk=Wr_fk, v_k=V_k, delta=delta, outerkmesh=kmesh, kmask=kmask, fmask=fmask)
 
     np.testing.assert_array_almost_equal(sigma_fk.data[:,0,:], sigma_fk_masked.data[:,0,:], decimal=4)
     np.testing.assert_array_almost_equal(sigma_fk_masked.data[:,1:,:], np.zeros_like(sigma_fk_masked.data[:,1:,:]), decimal=10)
+
+
+    print('--> gw_self_energy with outer kmesh')
+    outerkmesh = t_r.get_kmesh((nk, 1, 1))
+    kmask = [True]
+    fmask = [True]
+    sigma_fk_withOuterMesh = g0w_sigma(mu=mu, beta=beta, e_k=e_k, W_fk=Wr_fk, v_k=V_k, delta=delta, outerkmesh=outerkmesh, kmask=kmask, fmask=fmask)
+
+    karr = np.array(list(kmesh.values()))
+    kx_ind = np.where( np.isclose(karr[:,1], 0.0) )[0]
+
+    assert np.allclose( karr[kx_ind,1], 0.0) 
+    np.testing.assert_array_almost_equal(
+        sigma_fk.data[:,kx_ind,:], sigma_fk_withOuterMesh.data)
+
 
     print('--> lattice_dyson_g_wk')
     g_fk = lattice_dyson_g_fk(mu, e_k, sigma_fk, delta)

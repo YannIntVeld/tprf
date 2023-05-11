@@ -151,7 +151,7 @@ namespace triqs_tprf {
     @return real frequency GW self-energy :math:`\Sigma_{ab}(\omega, \mathbf{k})`
 */
 
-  g_fk_t g0w_sigma(double mu, double beta, e_k_cvt e_k, chi_fk_cvt W_fk, chi_k_cvt v_k, double delta, nda::vector<bool> kmask, nda::vector<bool> fmask);
+  g_fk_t g0w_sigma(double mu, double beta, e_k_cvt e_k, chi_fk_cvt W_fk, chi_k_cvt v_k, double delta, gf_mesh<brzone> outerkmesh, nda::vector<bool> kmask, nda::vector<bool> fmask);
   g_fk_t g0w_sigma(double mu, double beta, e_k_cvt e_k, chi_fk_cvt W_fk, chi_k_cvt v_k, double delta);
 
   /** GW self energy :math:`\Sigma(\mathbf{k})` calculator for static interactions
