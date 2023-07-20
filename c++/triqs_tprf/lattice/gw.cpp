@@ -148,7 +148,7 @@ namespace triqs_tprf {
 
   for (auto const &[f, k] : WSpec_fk.mesh()) {
     for (int i : range(nb)) {
-      for (int j : range(nb)) { WSpec_fk[f, k](i, j) = -1.0 / 3.141592653589793 * (W_fk[f, k](i, j, i, j) - v_k[k](i, j, i, j)).imag(); }
+      for (int j : range(nb)) { WSpec_fk[f, k](i, j) = -1.0 / 3.141592653589793 * (W_fk[f, k](i, i, j, j) - v_k[k](i, i, j, j)).imag(); }
     }
   }
 
@@ -177,16 +177,18 @@ namespace triqs_tprf {
             if(!fmask[ind]) continue;
           }
 
-          for (auto const &fp : fmesh) {
+        
+          for (const auto &[a, b] : sigma_fk.target_indices()) {
+            for (auto const &fp : fmesh) {
 
-            auto num = bose2(fp * beta) + fermi2(ekq(l) * beta);
-            auto den = f + idelta + fp - ekq(l);
+              auto num = bose2(fp * beta) + fermi2(ekq(l) * beta);
+              auto den = f + idelta + fp - ekq(l);
 
-            sigma_fk[f, k](a, b) << sigma_fk[f, k](a, b)
-                  + Ukq(l, a) * dagger(Ukq)(b, l) * (WSpec_fk[fp, q](a, b) * num / den * fmesh.delta() / kmesh.size());
+              sigma_fk[f, k](a, b) += dagger(Ukq)(a, l) * Ukq(l, b) * (WSpec_fk[fp, q](a, b) * num / den * fmesh.delta() / kmesh.size());
+            }
+
+            sigma_fk[f, k](a, b) += -dagger(Ukq)(a, l) * Ukq(l, b) * v_k[q](a, a, b, b) * fermi2(ekq(l) * beta) / kmesh.size();
           }
-
-          sigma_fk[f, k](a, b) << sigma_fk[f, k](a, b) - Ukq(l, a) * dagger(Ukq)(b, l) * v_k[q](a, b, a, b) * fermi2(ekq(l) * beta) / kmesh.size();
         }
       }
     }
@@ -224,7 +226,9 @@ namespace triqs_tprf {
       auto Ukq    = eig_kq.second;
 
       for (int l : range(nb)) {
-        sigma_k[k](a, b) << sigma_k[k](a, b) - Ukq(l, a) * dagger(Ukq)(b, l) * v_k[q](a, b, a, b) * fermi2(ekq(l) * beta) / kmesh.size();
+        for (const auto &[a, b] : sigma_k.target_indices()) {
+          sigma_k[k](a, b) += - dagger(Ukq)(a, l) * Ukq(l, b) * v_k[q](a, a, b, b) * fermi2(ekq(l) * beta) / kmesh.size();
+        }
       }
     }
   }
