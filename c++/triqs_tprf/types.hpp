@@ -178,6 +178,10 @@ typedef gf<imfreq, tensor_valued<4>> chi_w_t;
 typedef chi_w_t::const_view_type chi_w_cvt;
 typedef chi_w_t::view_type chi_w_vt;
 
+typedef gf<prod<brzone, brzone>, matrix_valued> g_kk_t;
+typedef g_kk_t::const_view_type g_kk_cvt;
+typedef g_kk_t::view_type g_kk_vt;
+
     // -- back to old style
 
 typedef gf<prod<brzone, imfreq, imfreq, imfreq>, tensor_valued<4>> chiq_t;

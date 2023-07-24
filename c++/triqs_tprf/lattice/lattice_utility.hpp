@@ -39,4 +39,22 @@ namespace triqs_tprf {
   @return Tuple of chi_dyn_wk, the dynamic part of chi :math:`\chi^{(dyn)}_{abcd}(i\omega_n, \mathbf{k})`, which converges to zero for :math:`\omega_n \rightarrow \infty`, and chi_const_k, the part of chi that is constant in Matsubara frequency space :math:`\chi^{(stat)}_{abcd}(\mathbf{k})`.
   */
   std::tuple<chi_wk_t, chi_k_t> split_into_dynamic_wk_and_constant_k(chi_wk_cvt chi_wk);
+
+   /** Calculates the density-density terms of a static Coulomb interaction
+   in the band basis from the full Coulomb tensor in the orbital basis.
+   
+     .. math ::
+         V_{ij}(\mathbf{k}, \mathbf{k}') = 
+             \sum_{ab} \psi^\dagger_{ai}(\mathbf{k})
+                       \psi^\dagger_{bj}(\mathbf{k}')
+                       \psi_{bj}(\mathbf{k})
+                       \psi_{ai}(\mathbf{k}')
+                       V_{ab}(\mathbf{k} - \mathbf{k})
+ 
+     @param Coulomb tensor V_k in the orbital basis :math:`V_{ab}(\mathbf{q})`
+     @param Eigenvector :math:`\psi_{ai}(\mathbf{k})`
+     @return Density-density Coulomb interaction Wb_kkp in the band basis :math:`V_{ij}(\mathbf{k}, \mathbf{k}')`
+  */
+  g_kk_t densdens_V_orb_to_band_basis(chi_k_cvt V_k, e_k_cvt psi_k);
+
 } // namespace triqs_tprf

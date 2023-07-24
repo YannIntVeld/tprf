@@ -428,6 +428,8 @@ Returns
 out
      Tuple of chi_dyn_wk, the dynamic part of chi, which converges to zero for :math:`\omega_n \rightarrow \infty`, and chi_const_k, the part of chi that is constant in Matsubara frequency space :math:`\chi(\mathbf{k})`.""")
 
+module.add_function ("triqs_tprf::g_kk_t densdens_V_orb_to_band_basis(triqs_tprf::chi_k_cvt V_k, triqs_tprf::e_k_cvt psi_k)", doc = r"""Some doc""")
+
 module.add_function ("triqs_tprf::g_wk_t triqs_tprf::gw_sigma (triqs_tprf::chi_wk_cvt W_wk, triqs_tprf::g_wk_cvt g_wk)", doc = r"""GW self energy :math:`\Sigma(i\omega_n, \mathbf{k})` calculator for dynamic interactions
 
     Splits the interaction into a dynamic and a static part
