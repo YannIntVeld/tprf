@@ -44,7 +44,11 @@ typedef g_iw_t::view_type g_iw_vt;
 typedef gf<brzone, matrix_valued> ek_t;
 typedef ek_t::const_view_type ek_cvt;
 typedef ek_t::view_type ek_vt;
-  
+
+typedef gf<brzone, tensor_valued<1>> eps_t;
+typedef eps_t::const_view_type eps_cvt;
+typedef eps_t::view_type eps_vt;
+
 typedef gf<prod<imfreq, brzone>, matrix_valued> gk_iw_t;
 typedef gk_iw_t::const_view_type gk_iw_cvt;
 typedef gk_iw_t::view_type gk_iw_vt;

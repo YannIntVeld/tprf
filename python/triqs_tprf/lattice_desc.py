@@ -430,6 +430,8 @@ out
 
 module.add_function ("triqs_tprf::g_kk_t densdens_V_orb_to_band_basis(triqs_tprf::chi_k_cvt V_k, triqs_tprf::e_k_cvt psi_k)", doc = r"""Some doc""")
 
+module.add_function ("nda::array<std::complex<double>,1> gaussian_dos(eps_cvt eps_k, double mu, double sigma)", doc = r"""Some doc""")
+
 module.add_function ("triqs_tprf::g_wk_t triqs_tprf::gw_sigma (triqs_tprf::chi_wk_cvt W_wk, triqs_tprf::g_wk_cvt g_wk)", doc = r"""GW self energy :math:`\Sigma(i\omega_n, \mathbf{k})` calculator for dynamic interactions
 
     Splits the interaction into a dynamic and a static part

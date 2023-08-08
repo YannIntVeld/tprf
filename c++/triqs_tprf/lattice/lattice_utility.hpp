@@ -57,4 +57,20 @@ namespace triqs_tprf {
   */
   g_kk_t densdens_V_orb_to_band_basis(chi_k_cvt V_k, e_k_cvt psi_k);
 
+  /** Calculates the density of states (DOS) of an electronic dispersion using Gaussian broadening.
+  The function evaluates
+    
+    .. math ::
+        N_{i}(E) = \frac{1}{N_k} \sum_{k} \delta(\epsilon_{\mathbf{k}, i} - E)
+
+  where the delta function is approximated by a Gaussian function and $\epsilon_{\mathbf{k}, i}$
+  is the diagonalized matrix-valued dispersion relation $\epsilon_{\bar{a}b}(\mathbf{k})$.
+
+  @param eps_k diagonalized lattice dispersion :math:`\epsilon_(\mathbf{k},i)`
+  @param E energy at which to evaluate the density of states
+  @param sigma broadening used for the Gaussian function
+  @return the density of states
+  */
+  nda::array<std::complex<double>,1> gaussian_dos(eps_cvt eps_k, double E, double sigma);
+
 } // namespace triqs_tprf
