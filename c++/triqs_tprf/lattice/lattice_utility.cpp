@@ -100,4 +100,30 @@ namespace triqs_tprf {
     return DOS;
   }
 
+  std::complex<double> densdens_V_pseudopotential(eps_cvt eps_k, double mu, double sigma, g_kk_t Vb_kkp) {
+    auto N0_b = gaussian_dos(eps_k, mu, sigma);
+    auto nb = N0_b.shape()[0];
+    std::complex<double> N0 = 0.0;
+    for (int i : range(nb))
+        N0 += N0_b(i);
+
+    auto kmesh = eps_k.mesh();
+
+    std::complex<double> pseudo_mu = 0.0;
+
+    auto arr = mpi_view(Vb_kkp.mesh());
+    for (unsigned int idx = 0; idx < arr.size(); idx++) {
+      auto &[k, kp] = arr(idx);
+      for (const auto &[i,j] : Vb_kkp.target_indices()) {
+        pseudo_mu += gaussian(eps_k[k](i) - mu, sigma)
+                   * gaussian(eps_k[kp](j) - mu, sigma)
+                   * Vb_kkp[k,kp](i,j);
+      }
+    }
+
+    pseudo_mu = mpi::all_reduce(pseudo_mu);
+    pseudo_mu /= N0 * kmesh.size() * kmesh.size();
+    return pseudo_mu;
+  }
+
 } // namespace triqs_tprf
