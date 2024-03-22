@@ -34,7 +34,7 @@
 
 namespace triqs_tprf {
 
-  array<std::complex<double>, 2> gamma_3pnt(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk) {
+  std::complex<double> gamma_3pnt(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk) {
 
   int nb = g_wk.target().shape()[0];
   auto Wwm = std::get<0>(W_wk.mesh());
@@ -53,33 +53,137 @@ namespace triqs_tprf {
   auto qmesh = std::get<1>(W_wk.mesh());
   auto beta = wmesh_b.beta();
 
-  array<std::complex<double>, 2> gamma(nb ,nb);
-  gamma() = 0.0;
+  std::complex<double> gamma;
+  gamma = 0.0;
 
-  auto arr = mpi_view(qmesh);
-  #pragma omp parallel for
-  for (unsigned int idx = 0; idx < arr.size(); idx++) {
-    auto &q  = arr[idx];
+  for (auto q : qmesh){
     auto qval = mesh::brzone::value_t{q};
-
     triqs::mesh::brzone::value_t kmqval = kval - qval;
     triqs::mesh::brzone::value_t kpmqval = kpval - qval;
 
     for (auto wm : wmesh_b) {
       auto wmval = mesh::imfreq::value_t{wm};
 
-      auto W = W_wk[wm,q];
-      auto g_1 = g_wk(wnval-wmval, kmqval);
-      auto g_2 = g_wk(wnpval-wmval, kpmqval);
+      auto W = W_wk[wm,q](0,0,0,0);
+      auto g_1 = g_wk(wnval-wmval, kmqval)(0,0);
+      auto g_2 = g_wk(wnpval-wmval, kpmqval)(0,0);
 
-      for (int a : range(nb)) {
-        gamma(a,a) = gamma(a,a) - W(a,a,a,a) * g_1(a,a) * g_2(a,a) / (beta * qmesh.size());
+      gamma -= W * g_1 * g_2 / (beta * qmesh.size());
+    }
+  }
+
+  return gamma;
+  }
+
+
+  std::complex<double> sc_kernel_1storder(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk) {
+
+  int nb = g_wk.target().shape()[0];
+  auto Wwm = std::get<0>(W_wk.mesh());
+  auto gwm = std::get<0>(g_wk.mesh());
+
+  if (Wwm.beta() != gwm.beta())
+    TRIQS_RUNTIME_ERROR << "sc_kernel_1storder: inverse temperatures are not the same.\n";
+  if (Wwm.statistic() != Boson || gwm.statistic() != Fermion)
+    TRIQS_RUNTIME_ERROR << "sc_kernel_1storder: statistics are incorrect.\n";
+  if (std::get<1>(W_wk.mesh()) != std::get<1>(g_wk.mesh()))
+    TRIQS_RUNTIME_ERROR << "sc_kernel_1storder: k-space meshes are not the same.\n";
+  if (nb != 1)
+    TRIQS_RUNTIME_ERROR << "sc_kernel_1storder: not implemented for multiorbital systems.\n";
+
+  auto wmesh_b = std::get<0>(W_wk.mesh());
+  auto qmesh = std::get<1>(W_wk.mesh());
+  auto beta = wmesh_b.beta();
+
+  triqs::mesh::brzone::value_t negkpval = - kpval;
+  triqs::mesh::brzone::value_t kmkpval = kval - kpval;
+  mesh::imfreq::value_t wnmwnpval = wnval - wnpval;
+
+  auto W = W_wk(wnmwnpval, kmkpval)(0,0,0,0);
+  auto g_pos = g_wk(wnpval, kpval)(0,0);
+  auto g_neg = g_wk(-wnpval, negkpval)(0,0);
+
+  std::complex<double> kernel;
+  kernel = - g_pos * g_neg * W / beta;
+  return kernel;
+  }
+
+
+  std::complex<double> sc_kernel_2ndorder(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk, g_wk_cvt sigma_wk,
+                                          bool gamma_kernel=true, bool sigma_kernel=true) {
+
+  auto wmesh_b = std::get<0>(W_wk.mesh());
+  auto beta = wmesh_b.beta();
+
+  triqs::mesh::brzone::value_t negkpval = - kpval;
+  triqs::mesh::brzone::value_t kmkpval = kval - kpval;
+  mesh::imfreq::value_t wnmwnpval = wnval - wnpval;
+
+  auto W = W_wk(wnmwnpval, kmkpval)(0,0,0,0);
+  auto g_pos = g_wk(wnpval, kpval)(0,0);
+  auto g_neg = g_wk(-wnpval, negkpval)(0,0);
+
+  std::complex<double> kernel;
+  kernel = 0;
+  if (gamma_kernel) {
+    auto gamma_pos = gamma_3pnt(kval, kpval, wnval, wnpval, W_wk, g_wk);
+    auto gamma_neg = gamma_3pnt(-kval, -kpval, -wnval, -wnpval, W_wk, g_wk);
+    kernel -= W * g_pos * g_neg * (gamma_pos + gamma_neg) / beta;
+  }
+  
+  if (sigma_kernel)
+    kernel -= W * g_pos * (sigma_wk(wnpval, kpval)(0,0) * g_pos + g_neg * sigma_wk(-wnpval, negkpval)(0,0)) * g_neg / beta;
+  
+  return kernel;
+  }
+
+
+  std::complex<double> sc_eigenvalue_2ndorder(g_wk_cvt delta_wk, chi_wk_cvt W_wk, g_wk_cvt g_wk, g_wk_cvt sigma_wk,
+                                              bool gamma_kernel=true, bool sigma_kernel=true) {
+
+  int nb = g_wk.target().shape()[0];
+  auto Wwm = std::get<0>(W_wk.mesh());
+  auto gwm = std::get<0>(g_wk.mesh());
+
+  if (Wwm.beta() != gwm.beta())
+    TRIQS_RUNTIME_ERROR << "sc_eigenvalue_2ndorder: inverse temperatures are not the same.\n";
+  if (Wwm.statistic() != Boson || gwm.statistic() != Fermion)
+    TRIQS_RUNTIME_ERROR << "sc_eigenvalue_2ndorder: statistics are incorrect.\n";
+  if (std::get<1>(W_wk.mesh()) != std::get<1>(g_wk.mesh()))
+    TRIQS_RUNTIME_ERROR << "sc_eigenvalue_2ndorder: k-space meshes are not the same.\n";
+  if (nb != 1)
+    TRIQS_RUNTIME_ERROR << "sc_eigenvalue_2ndorder: not implemented for multiorbital systems.\n";
+
+  auto wmesh_f = std::get<0>(delta_wk.mesh());
+  auto kmesh = std::get<1>(delta_wk.mesh());
+  auto beta = wmesh_f.beta();
+
+  std::complex<double> eigenval;
+  eigenval = 0;
+  std::complex<double> norm;
+  norm = 0;
+
+  auto arr = mpi_view(kmesh);
+  #pragma omp parallel for
+  for (unsigned int idx = 0; idx < arr.size(); idx++) {
+    auto &k  = arr[idx];
+    auto kval = mesh::brzone::value_t{k};
+    for (auto kp : kmesh){
+      auto kpval = mesh::brzone::value_t{kp};
+      for (auto wn : wmesh_f) {
+        auto wnval = mesh::imfreq::value_t{wn};
+        for (auto wnp : wmesh_f) {
+          auto wnpval = mesh::imfreq::value_t{wnp};
+          auto kernel = sc_kernel_2ndorder(kval, kpval, wnval, wnpval, W_wk, g_wk, sigma_wk, gamma_kernel, sigma_kernel);
+          eigenval += delta_wk[wn,k](0,0) * kernel * delta_wk[wnp,kp](0,0) / (beta * beta * kmesh.size() * kmesh.size());
+          norm += delta_wk[wn,k](0,0) * delta_wk[wnp,kp](0,0) / (beta * beta * kmesh.size() * kmesh.size());
+        }
       }
     }
   }
 
-  gamma = mpi::all_reduce(gamma);
-  return gamma;
+  eigenval = mpi::all_reduce(eigenval) / norm;
+  return eigenval;
   }
 
 } // namespace triqs_tprf

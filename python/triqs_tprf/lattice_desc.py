@@ -1752,9 +1752,10 @@ module.add_function ("triqs_tprf::chi_wk_t triqs_tprf::attatch_tri_vert (triqs_t
 
 
 
-module.add_function ("array<std::complex<double>, 2> gamma_3pnt(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk)", doc = r"""""")
-
-  
+module.add_function ("std::complex<double> gamma_3pnt(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk)", doc = r"""""")
+module.add_function ("std::complex<double> sc_kernel_1storder(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk)", doc = r"""""")
+module.add_function ("std::complex<double> sc_kernel_2ndorder(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk, g_wk_cvt sigma_wk, bool gamma_kernel=true, bool sigma_kernel=true)", doc = r"""""")
+module.add_function ("std::complex<double> sc_eigenvalue_2ndorder(g_wk_cvt delta_wk, chi_wk_cvt W_wk, g_wk_cvt g_wk, g_wk_cvt sigma_wk, bool gamma_kernel=true, bool sigma_kernel=true)", doc = r"""""")
 
 
 module.generate_code()
