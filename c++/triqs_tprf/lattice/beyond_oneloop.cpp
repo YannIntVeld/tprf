@@ -80,7 +80,6 @@ namespace triqs_tprf {
                                  bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true) {
 
   auto wmesh_b = std::get<0>(W_wk.mesh());
-  auto beta = wmesh_b.beta();
 
   triqs::mesh::brzone::value_t negkpval = - kpval;
   triqs::mesh::brzone::value_t kmkpval = kval - kpval;
@@ -130,9 +129,6 @@ namespace triqs_tprf {
 
   std::complex<double> eigenval;
   eigenval = 0;
-  std::complex<double> norm;
-  norm = 0;
-
   auto arr = mpi_view(kmesh);
   #pragma omp parallel for
   for (unsigned int idx = 0; idx < arr.size(); idx++) {
@@ -146,13 +142,24 @@ namespace triqs_tprf {
           auto wnpval = mesh::imfreq::value_t{wnp};
           auto kernel = sc_kernel(kval, kpval, wnval, wnpval, W_wk, g_wk, sigma_wk, oneloop_kernel, gamma_kernel, sigma_kernel);
           eigenval += delta_wk[wn,k](0,0) * kernel * delta_wk[wnp,kp](0,0) / (beta * beta * kmesh.size() * kmesh.size());
-          norm += delta_wk[wn,k](0,0) * delta_wk[wnp,kp](0,0) / (beta * beta * kmesh.size() * kmesh.size());
         }
       }
     }
   }
+  eigenval = mpi::all_reduce(eigenval);
 
-  eigenval = mpi::all_reduce(eigenval) / norm;
+  std::complex<double> norm;
+  norm = 0;
+  #pragma omp parallel for
+  for (unsigned int idx = 0; idx < arr.size(); idx++) {
+    auto &k  = arr[idx];
+    for (auto wn : wmesh_f) {
+      norm += delta_wk[wn,k](0,0) * delta_wk[wn,k](0,0) / (beta * kmesh.size());
+    }
+  }
+  norm = mpi::all_reduce(norm);
+
+  eigenval = eigenval / norm;
   return eigenval;
   }
 
