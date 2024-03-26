@@ -127,36 +127,48 @@ namespace triqs_tprf {
   auto kmesh = std::get<1>(delta_wk.mesh());
   auto beta = wmesh_f.beta();
 
-  std::complex<double> eigenval;
-  eigenval = 0;
+  std::complex<double> eigenval = 0;
+  std::complex<double> local_eigenval = 0;
+  std::complex<double> norm = 0;
+  std::complex<double> local_norm = 0;
+  
   auto arr = mpi_view(kmesh);
-  #pragma omp parallel for
-  for (unsigned int idx = 0; idx < arr.size(); idx++) {
-    auto &k  = arr[idx];
-    auto kval = mesh::brzone::value_t{k};
-    for (auto kp : kmesh){
-      auto kpval = mesh::brzone::value_t{kp};
-      for (auto wn : wmesh_f) {
-        auto wnval = mesh::imfreq::value_t{wn};
-        for (auto wnp : wmesh_f) {
-          auto wnpval = mesh::imfreq::value_t{wnp};
-          auto kernel = sc_kernel(kval, kpval, wnval, wnpval, W_wk, g_wk, sigma_wk, oneloop_kernel, gamma_kernel, sigma_kernel);
-          eigenval += delta_wk[wn,k](0,0) * kernel * delta_wk[wnp,kp](0,0) / (beta * beta * kmesh.size() * kmesh.size());
+ 
+  #pragma omp parallel private(local_eigenval, local_norm)
+  {
+    #pragma omp parallel for
+    for (unsigned int idx = 0; idx < arr.size(); idx++) {
+      auto &k  = arr[idx];
+      auto kval = mesh::brzone::value_t{k};
+      for (auto kp : kmesh){
+        auto kpval = mesh::brzone::value_t{kp};
+        for (auto wn : wmesh_f) {
+          auto wnval = mesh::imfreq::value_t{wn};
+          for (auto wnp : wmesh_f) {
+            auto wnpval = mesh::imfreq::value_t{wnp};
+            auto kernel = sc_kernel(kval, kpval, wnval, wnpval, W_wk, g_wk, sigma_wk, oneloop_kernel, gamma_kernel, sigma_kernel);
+            local_eigenval += delta_wk[wn,k](0,0) * kernel * delta_wk[wnp,kp](0,0) / (beta * beta * kmesh.size() * kmesh.size());
+          }
         }
       }
     }
-  }
-  eigenval = mpi::all_reduce(eigenval);
 
-  std::complex<double> norm;
-  norm = 0;
-  #pragma omp parallel for
-  for (unsigned int idx = 0; idx < arr.size(); idx++) {
-    auto &k  = arr[idx];
-    for (auto wn : wmesh_f) {
-      norm += delta_wk[wn,k](0,0) * delta_wk[wn,k](0,0) / (beta * kmesh.size());
+    #pragma omp parallel for
+    for (unsigned int idx = 0; idx < arr.size(); idx++) {
+      auto &k  = arr[idx];
+      for (auto wn : wmesh_f) {
+        local_norm += delta_wk[wn,k](0,0) * delta_wk[wn,k](0,0) / (beta * kmesh.size());
+      }
+    }
+
+    #pragma omp critical
+    {
+      eigenval += local_eigenval;
+      norm += local_norm;
     }
   }
+
+  eigenval = mpi::all_reduce(eigenval);
   norm = mpi::all_reduce(norm);
 
   eigenval = eigenval / norm;
