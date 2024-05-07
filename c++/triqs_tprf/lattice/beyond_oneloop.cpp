@@ -34,48 +34,45 @@
 
 namespace triqs_tprf {
 
-  std::complex<double> gamma_3pnt(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk) {
+  std::complex<double> gamma_3pnt(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk, mesh::imfreq wmesh_f) {
 
   int nb = g_wk.target().shape()[0];
   auto Wwm = std::get<0>(W_wk.mesh());
   auto gwm = std::get<0>(g_wk.mesh());
 
-  if (Wwm.beta() != gwm.beta())
+  if (Wwm.beta() != gwm.beta() || wmesh_f.beta() != gwm.beta())
     TRIQS_RUNTIME_ERROR << "gamma_3pnt: inverse temperatures are not the same.\n";
-  if (Wwm.statistic() != Boson || gwm.statistic() != Fermion)
+  if (Wwm.statistic() != Boson || gwm.statistic() != Fermion || wmesh_f.statistic() != Fermion)
     TRIQS_RUNTIME_ERROR << "gamma_3pnt: statistics are incorrect.\n";
   if (std::get<1>(W_wk.mesh()) != std::get<1>(g_wk.mesh()))
     TRIQS_RUNTIME_ERROR << "gamma_3pnt: k-space meshes are not the same.\n";
   if (nb != 1)
     TRIQS_RUNTIME_ERROR << "gamma_3pnt: not implemented for multiorbital systems.\n";
 
-  auto maxind = gwm.last_index() - Wwm.last_index();
-  if (maxind < 0) maxind = 0;
-  if (std::abs(wnval.index()) > maxind)
-    TRIQS_RUNTIME_ERROR << "gamma_3pnt: wnval ("+std::to_string(wnval.index())+") lies outside of possible interpolation range of G ("+std::to_string(maxind)+").\n";
-  if (std::abs(wnpval.index()) > maxind)
-    TRIQS_RUNTIME_ERROR << "gamma_3pnt: wnpval ("+std::to_string(wnpval.index())+") lies outside of possible interpolation range of G ("+std::to_string(maxind)+").\n";
+  if (std::abs(wnval.index()) + wmesh_f.last_index() > Wwm.last_index())
+    TRIQS_RUNTIME_ERROR << "gamma_3pnt: interpolating outside the Matsubara mesh of W. Please define W on a larger mesh (at least twice the inner Fermionic mesh).\n";
+  if (std::abs(wnpval.index()) + std::abs(wnval.index()) + wmesh_f.last_index() > gwm.last_index())
+    TRIQS_RUNTIME_ERROR << "gamma_3pnt: interpolating outside the Matsubara mesh of G. Please define G on a larger mesh (at least thrice the inner Fermionic mesh).\n";
 
-  auto wmesh_b = std::get<0>(W_wk.mesh());
-  auto qmesh = std::get<1>(W_wk.mesh());
-  auto beta = wmesh_b.beta();
+  auto kmesh = std::get<1>(g_wk.mesh());
+  auto beta = wmesh_f.beta();
 
   std::complex<double> gamma;
   gamma = 0.0;
 
-  for (auto q : qmesh){
-    auto qval = mesh::brzone::value_t{q};
-    triqs::mesh::brzone::value_t kmqval = kval - qval;
-    triqs::mesh::brzone::value_t kpmqval = kpval - qval;
+  for (auto kpp : kmesh){
+    auto kppval = mesh::brzone::value_t{kpp};
+    triqs::mesh::brzone::value_t kmkppval = kval - kppval;
+    triqs::mesh::brzone::value_t kpmkpkppval = kpval - kval + kppval;
 
-    for (auto wm : wmesh_b) {
-      auto wmval = mesh::imfreq::value_t{wm};
+    for (auto wnpp : wmesh_f) {
+      auto wnppval = mesh::imfreq::value_t{wnpp};
 
-      auto W = W_wk[wm,q](0,0,0,0);
-      auto g_1 = g_wk(wnval-wmval, kmqval)(0,0);
-      auto g_2 = g_wk(wnpval-wmval, kpmqval)(0,0);
+      auto W = W_wk(wnval - wnppval,kmkppval)(0,0,0,0);
+      auto g_1 = g_wk(wnppval, kppval)(0,0);
+      auto g_2 = g_wk(wnpval - wnval + wnppval, kpmkpkppval)(0,0);
 
-      gamma -= W * g_1 * g_2 / (beta * qmesh.size());
+      gamma -= W * g_1 * g_2 / (beta * kmesh.size());
     }
   }
 
@@ -83,38 +80,35 @@ namespace triqs_tprf {
   }
 
 
-  std::complex<double> gamma_3pnt(mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_w_cvt W_w, g_w_cvt g_w) {
+  std::complex<double> gamma_3pnt(mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_w_cvt W_w, g_w_cvt g_w, mesh::imfreq wmesh_f) {
 
   int nb = g_w.target().shape()[0];
   auto Wwm = W_w.mesh();
   auto gwm = g_w.mesh();
 
-  if (Wwm.beta() != gwm.beta())
+  if (Wwm.beta() != gwm.beta() || wmesh_f.beta() != gwm.beta())
     TRIQS_RUNTIME_ERROR << "gamma_3pnt: inverse temperatures are not the same.\n";
-  if (Wwm.statistic() != Boson || gwm.statistic() != Fermion)
+  if (Wwm.statistic() != Boson || gwm.statistic() != Fermion || wmesh_f.statistic() != Fermion)
     TRIQS_RUNTIME_ERROR << "gamma_3pnt: statistics are incorrect.\n";
   if (nb != 1)
     TRIQS_RUNTIME_ERROR << "gamma_3pnt: not implemented for multiorbital systems.\n";
 
-  auto maxind = gwm.last_index() - Wwm.last_index();
-  if (maxind < 0) maxind = 0;
-  if (std::abs(wnval.index()) > maxind)
-    TRIQS_RUNTIME_ERROR << "gamma_3pnt: wnval ("+std::to_string(wnval.index())+") lies outside of possible interpolation range of G ("+std::to_string(maxind)+").\n";
-  if (std::abs(wnpval.index()) > maxind)
-    TRIQS_RUNTIME_ERROR << "gamma_3pnt: wnpval ("+std::to_string(wnpval.index())+") lies outside of possible interpolation range of G ("+std::to_string(maxind)+").\n";
+  if (std::abs(wnval.index()) + wmesh_f.last_index() > Wwm.last_index())
+    TRIQS_RUNTIME_ERROR << "gamma_3pnt: interpolating outside the Matsubara mesh of W. Please define W on a larger mesh (at least twice the inner Fermionic mesh).\n";
+  if (std::abs(wnpval.index()) + std::abs(wnval.index()) + wmesh_f.last_index() > gwm.last_index())
+    TRIQS_RUNTIME_ERROR << "gamma_3pnt: interpolating outside the Matsubara mesh of G. Please define G on a larger mesh (at least thrice the inner Fermionic mesh).\n";
 
-  auto wmesh_b = W_w.mesh();
-  auto beta = wmesh_b.beta();
+  auto beta = wmesh_f.beta();
 
   std::complex<double> gamma;
   gamma = 0.0;
 
-  for (auto wm : wmesh_b) {
-    auto wmval = mesh::imfreq::value_t{wm};
+  for (auto wnpp : wmesh_f) {
+    auto wnppval = mesh::imfreq::value_t{wnpp};
 
-    auto W = W_w[wm](0,0,0,0);
-    auto g_1 = g_w(wnval-wmval)(0,0);
-    auto g_2 = g_w(wnpval-wmval)(0,0);
+    auto W = W_w(wnval - wnppval)(0,0,0,0);
+    auto g_1 = g_w(wnppval)(0,0);
+    auto g_2 = g_w(wnpval - wnval + wnppval)(0,0);
 
     gamma -= W * g_1 * g_2 / beta;
   }
@@ -125,13 +119,11 @@ namespace triqs_tprf {
 
 
   std::complex<double> sc_kernel(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk, g_wk_cvt sigma_wk,
-                                 bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true) {
+                                 mesh::imfreq wmesh_f, bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true) {
 
-  auto wmesh_b = std::get<0>(W_wk.mesh());
-
-  auto maxind = Wwm.last_index();
-  if (std::abs(wnval.index() - wnpval.index()) > maxind)
-    TRIQS_RUNTIME_ERROR << "sc_kernel: wnval - wnpval ("+std::to_string(wnval.index() - wnpval.index())+") lies outside of possible interpolation range of W ("+std::to_string(maxind)+").\n";
+  auto Wwm = std::get<0>(W_wk.mesh());
+  if (std::abs(wnval.index() - wnpval.index()) > Wwm.last_index())
+    TRIQS_RUNTIME_ERROR << "sc_kernel: interpolating outside the Matsubara mesh of W. Please define W on a larger mesh (at least twice the inner Fermionic mesh).\n";
 
   triqs::mesh::brzone::value_t negkpval = - kpval;
   triqs::mesh::brzone::value_t kmkpval = kval - kpval;
@@ -144,8 +136,8 @@ namespace triqs_tprf {
   std::complex<double> kernel;
   kernel = 0;
   if (gamma_kernel) {
-    auto gamma_pos = gamma_3pnt(kval, kpval, wnval, wnpval, W_wk, g_wk);
-    auto gamma_neg = gamma_3pnt(-kval, -kpval, -wnval, -wnpval, W_wk, g_wk);
+    auto gamma_pos = gamma_3pnt(kval, kpval, wnval, wnpval, W_wk, g_wk, wmesh_f);
+    auto gamma_neg = gamma_3pnt(-kval, -kpval, -wnval, -wnpval, W_wk, g_wk, wmesh_f);
     kernel -= W * g_pos * g_neg * (gamma_pos + gamma_neg);
   }
   
@@ -198,7 +190,7 @@ namespace triqs_tprf {
           auto wnval = mesh::imfreq::value_t{wn};
           for (auto wnp : wmesh_f) {
             auto wnpval = mesh::imfreq::value_t{wnp};
-            auto kernel = sc_kernel(kval, kpval, wnval, wnpval, W_wk, g_wk, sigma_wk, oneloop_kernel, gamma_kernel, sigma_kernel);
+            auto kernel = sc_kernel(kval, kpval, wnval, wnpval, W_wk, g_wk, sigma_wk, wmesh_f, oneloop_kernel, gamma_kernel, sigma_kernel);
             local_eigenval += delta_wk[wn,k](0,0) * kernel * delta_wk[wnp,kp](0,0) / (beta * beta * kmesh.size() * kmesh.size());
           }
         }
