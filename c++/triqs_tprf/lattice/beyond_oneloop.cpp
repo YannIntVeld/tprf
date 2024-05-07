@@ -115,13 +115,13 @@ namespace triqs_tprf {
   auto gwm = std::get<0>(g_wk.mesh());
 
   if (Wwm.beta() != gwm.beta())
-    TRIQS_RUNTIME_ERROR << "sc_eigenvalue_2ndorder: inverse temperatures are not the same.\n";
+    TRIQS_RUNTIME_ERROR << "sc_eigenvalue: inverse temperatures are not the same.\n";
   if (Wwm.statistic() != Boson || gwm.statistic() != Fermion)
-    TRIQS_RUNTIME_ERROR << "sc_eigenvalue_2ndorder: statistics are incorrect.\n";
+    TRIQS_RUNTIME_ERROR << "sc_eigenvalue: statistics are incorrect.\n";
   if (std::get<1>(W_wk.mesh()) != std::get<1>(g_wk.mesh()))
-    TRIQS_RUNTIME_ERROR << "sc_eigenvalue_2ndorder: k-space meshes are not the same.\n";
+    TRIQS_RUNTIME_ERROR << "sc_eigenvalue: k-space meshes are not the same.\n";
   if (nb != 1)
-    TRIQS_RUNTIME_ERROR << "sc_eigenvalue_2ndorder: not implemented for multiorbital systems.\n";
+    TRIQS_RUNTIME_ERROR << "sc_eigenvalue: not implemented for multiorbital systems.\n";
 
   auto wmesh_f = std::get<0>(delta_wk.mesh());
   auto kmesh = std::get<1>(delta_wk.mesh());
