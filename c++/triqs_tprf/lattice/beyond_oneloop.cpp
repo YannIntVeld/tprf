@@ -76,6 +76,40 @@ namespace triqs_tprf {
   }
 
 
+  std::complex<double> gamma_3pnt(mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_w_cvt W_w, g_w_cvt g_w) {
+
+  int nb = g_w.target().shape()[0];
+  auto Wwm = W_w.mesh();
+  auto gwm = g_w.mesh();
+
+  if (Wwm.beta() != gwm.beta())
+    TRIQS_RUNTIME_ERROR << "gamma_3pnt: inverse temperatures are not the same.\n";
+  if (Wwm.statistic() != Boson || gwm.statistic() != Fermion)
+    TRIQS_RUNTIME_ERROR << "gamma_3pnt: statistics are incorrect.\n";
+  if (nb != 1)
+    TRIQS_RUNTIME_ERROR << "gamma_3pnt: not implemented for multiorbital systems.\n";
+
+  auto wmesh_b = W_w.mesh();
+  auto beta = wmesh_b.beta();
+
+  std::complex<double> gamma;
+  gamma = 0.0;
+
+  for (auto wm : wmesh_b) {
+    auto wmval = mesh::imfreq::value_t{wm};
+
+    auto W = W_w[wm](0,0,0,0);
+    auto g_1 = g_w(wnval-wmval)(0,0);
+    auto g_2 = g_w(wnpval-wmval)(0,0);
+
+    gamma -= W * g_1 * g_2 / beta;
+  }
+
+  return gamma;
+  }
+
+
+
   std::complex<double> sc_kernel(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk, g_wk_cvt sigma_wk,
                                  bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true) {
 
