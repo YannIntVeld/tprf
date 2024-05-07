@@ -49,6 +49,13 @@ namespace triqs_tprf {
   if (nb != 1)
     TRIQS_RUNTIME_ERROR << "gamma_3pnt: not implemented for multiorbital systems.\n";
 
+  auto maxind = gwm.last_index() - Wwm.last_index();
+  if (maxind < 0) maxind = 0;
+  if (std::abs(wnval.index()) > maxind)
+    TRIQS_RUNTIME_ERROR << "gamma_3pnt: wnval ("+std::to_string(wnval.index())+") lies outside of possible interpolation range of G ("+std::to_string(maxind)+").\n";
+  if (std::abs(wnpval.index()) > maxind)
+    TRIQS_RUNTIME_ERROR << "gamma_3pnt: wnpval ("+std::to_string(wnpval.index())+") lies outside of possible interpolation range of G ("+std::to_string(maxind)+").\n";
+
   auto wmesh_b = std::get<0>(W_wk.mesh());
   auto qmesh = std::get<1>(W_wk.mesh());
   auto beta = wmesh_b.beta();
@@ -89,6 +96,13 @@ namespace triqs_tprf {
   if (nb != 1)
     TRIQS_RUNTIME_ERROR << "gamma_3pnt: not implemented for multiorbital systems.\n";
 
+  auto maxind = gwm.last_index() - Wwm.last_index();
+  if (maxind < 0) maxind = 0;
+  if (std::abs(wnval.index()) > maxind)
+    TRIQS_RUNTIME_ERROR << "gamma_3pnt: wnval ("+std::to_string(wnval.index())+") lies outside of possible interpolation range of G ("+std::to_string(maxind)+").\n";
+  if (std::abs(wnpval.index()) > maxind)
+    TRIQS_RUNTIME_ERROR << "gamma_3pnt: wnpval ("+std::to_string(wnpval.index())+") lies outside of possible interpolation range of G ("+std::to_string(maxind)+").\n";
+
   auto wmesh_b = W_w.mesh();
   auto beta = wmesh_b.beta();
 
@@ -114,6 +128,10 @@ namespace triqs_tprf {
                                  bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true) {
 
   auto wmesh_b = std::get<0>(W_wk.mesh());
+
+  auto maxind = Wwm.last_index();
+  if (std::abs(wnval.index() - wnpval.index()) > maxind)
+    TRIQS_RUNTIME_ERROR << "sc_kernel: wnval - wnpval ("+std::to_string(wnval.index() - wnpval.index())+") lies outside of possible interpolation range of W ("+std::to_string(maxind)+").\n";
 
   triqs::mesh::brzone::value_t negkpval = - kpval;
   triqs::mesh::brzone::value_t kmkpval = kval - kpval;
