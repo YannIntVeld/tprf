@@ -67,15 +67,18 @@ namespace triqs_tprf {
 
     for (auto wnpp : wmesh_f) {
       auto wnppval = mesh::imfreq::value_t{wnpp};
+      triqs::mesh::imfreq::value_t wnmwnppval = wnval - wnppval;
+      triqs::mesh::imfreq::value_t wnpmwnpwnpp = wnpval - wnval + wnppval;
 
-      auto W = W_wk(wnval - wnppval,kmkppval)(0,0,0,0);
-      auto g_1 = g_wk[wnpp, kpp](0,0);
-      auto g_2 = g_wk(wnpval - wnval + wnppval, kpmkpkppval)(0,0);
+      auto W = W_wk(wnmwnppval,kmkppval)(0,0,0,0);
+      auto g_1 = g_wk(wnppval, kppval)(0,0);
+      auto g_2 = g_wk(wnpmwnpwnpp, kpmkpkppval)(0,0);
 
-      gamma -= W * g_1 * g_2 / (beta * kmesh.size());
+      gamma -= W * g_1 * g_2;
     }
   }
 
+  gamma = gamma / (beta * kmesh.size());
   return gamma;
   }
 
@@ -107,7 +110,7 @@ namespace triqs_tprf {
     auto wnppval = mesh::imfreq::value_t{wnpp};
 
     auto W = W_w(wnval - wnppval)(0,0,0,0);
-    auto g_1 = g_w[wnpp](0,0);
+    auto g_1 = g_w(wnppval)(0,0);
     auto g_2 = g_w(wnpval - wnval + wnppval)(0,0);
 
     gamma -= W * g_1 * g_2 / beta;
