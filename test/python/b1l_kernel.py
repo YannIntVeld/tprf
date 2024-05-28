@@ -8,6 +8,7 @@ from triqs.gf import *
 from triqs.lattice.lattice_tools import BrillouinZone, BravaisLattice
 
 from triqs_tprf.lattice import lattice_dyson_g0_wk
+from triqs_tprf.lattice import gw_sigma
 from triqs_tprf.lattice import sc_kernel
 
 # ----------------------------------------------------------------------
@@ -28,7 +29,7 @@ def test_local_sc_kernel():
     
     nw_matsubara = int(wcut * beta / (2.0 * np.pi) - 0.5)
     wmesh_f  = MeshImFreq(beta, 'Fermion', nw_matsubara*3)
-    wmesh_b = MeshImFreq(beta, 'Boson', nw_matsubara*2)
+    wmesh_b = MeshImFreq(beta, 'Boson', nw_matsubara*3)
   
     print("Fermionic mesh:", len(wmesh_f))
     print("  Bosonic mesh:", len(wmesh_b))
@@ -49,9 +50,7 @@ def test_local_sc_kernel():
     W_w = W_wk[:,Idx([0,0,0])]
 
     print('--> get normal self-energy')
-    sigma_wk =g0_wk.copy()
-    sigma_wk.data[:] = 0.0
-
+    sigma_wk = gw_sigma(W_wk, g0_wk)
     sigma_w = sigma_wk[:,Idx(0,0,0)]
 
     print('--> sc_kernel (non-local)') 
