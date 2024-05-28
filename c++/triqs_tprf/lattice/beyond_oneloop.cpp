@@ -120,6 +120,87 @@ namespace triqs_tprf {
   }
 
 
+  std::complex<double> chiA_4pnt(mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_w_cvt W_w, g_w_cvt g_w, mesh::imfreq wmesh_f) {
+
+  int nb = g_w.target().shape()[0];
+  auto Wwm = W_w.mesh();
+  auto gwm = g_w.mesh();
+
+  if (Wwm.beta() != gwm.beta() || wmesh_f.beta() != gwm.beta())
+    TRIQS_RUNTIME_ERROR << "chiA_4pnt: inverse temperatures are not the same.\n";
+  if (Wwm.statistic() != Boson || gwm.statistic() != Fermion || wmesh_f.statistic() != Fermion)
+    TRIQS_RUNTIME_ERROR << "chiA_4pnt: statistics are incorrect.\n";
+  if (nb != 1)
+    TRIQS_RUNTIME_ERROR << "chiA_4pnt: not implemented for multiorbital systems.\n";
+
+  if (std::abs(wnval.index()) + wmesh_f.last_index() > Wwm.last_index())
+    TRIQS_RUNTIME_ERROR << "chiA_4pnt: interpolating outside the Matsubara mesh of W. Please define W on a larger mesh (at least twice the inner Fermionic mesh).\n";
+  if (std::abs(wnpval.index()) + std::abs(wnval.index()) + wmesh_f.last_index() > gwm.last_index())
+    TRIQS_RUNTIME_ERROR << "chiA_4pnt: interpolating outside the Matsubara mesh of G. Please define G on a larger mesh (at least thrice the inner Fermionic mesh).\n";
+
+  auto beta = wmesh_f.beta();
+
+  std::complex<double> chi;
+  chi = 0.0;
+
+  for (auto wnpp : wmesh_f) {
+    auto wnppval = mesh::imfreq::value_t{wnpp};
+
+    auto W1 = W_w(wnpval - wnppval)(0,0,0,0);
+    auto W2 = W_w( wnval - wnppval)(0,0,0,0);
+    auto g_1 = g_w(wnpval + wnval - wnppval)(0,0);
+    auto g_2 = g_w(-wnppval)(0,0);
+
+    chi += W1 * W2 * g_1 * g_2 / beta;
+  }
+
+  return chi;
+  }
+  
+  
+  std::complex<double> chiB_4pnt(mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_w_cvt W_w, g_wk_cvt g_wk, mesh::imfreq wmesh_f) {
+
+  int nb = g_wk.target().shape()[0];
+  auto Wwm = W_w.mesh();
+  auto gwm = std::get<0>(g_wk.mesh());
+
+  if (Wwm.beta() != gwm.beta() || wmesh_f.beta() != gwm.beta())
+    TRIQS_RUNTIME_ERROR << "chiB_4pnt: inverse temperatures are not the same.\n";
+  if (Wwm.statistic() != Boson || gwm.statistic() != Fermion || wmesh_f.statistic() != Fermion)
+    TRIQS_RUNTIME_ERROR << "chiB_4pnt: statistics are incorrect.\n";
+  if (nb != 1)
+    TRIQS_RUNTIME_ERROR << "chiB_4pnt: not implemented for multiorbital systems.\n";
+
+  if (std::abs(wnval.index()) + wmesh_f.last_index() > Wwm.last_index())
+    TRIQS_RUNTIME_ERROR << "chiB_4pnt: interpolating outside the Matsubara mesh of W. Please define W on a larger mesh (at least twice the inner Fermionic mesh).\n";
+  if (std::abs(wnpval.index()) + std::abs(wnval.index()) + wmesh_f.last_index() > gwm.last_index())
+    TRIQS_RUNTIME_ERROR << "chiB_4pnt: interpolating outside the Matsubara mesh of G. Please define G on a larger mesh (at least thrice the inner Fermionic mesh).\n";
+
+  auto beta = wmesh_f.beta();
+  auto g_kmesh = std::get<1>(g_wk.mesh());
+
+  std::complex<double> chi;
+  chi = 0.0;
+
+  for (auto wnpp : wmesh_f) {
+    auto wnppval = mesh::imfreq::value_t{wnpp};
+
+    std::complex<double> g_g_product = 0.0;
+    for (auto k : g_kmesh){
+      g_g_product += g_wk[wnpp,k](0,0) * g_wk[-wnpp,-k](0,0) / g_kmesh.size();
+    }
+
+    auto W1 = W_w(wnpval - wnppval)(0,0,0,0);
+    auto W2 = W_w( wnval - wnppval)(0,0,0,0);
+
+    chi += W1 * W2 * g_g_product / beta;
+  }
+
+  return chi;
+  }
+
+
+
 
   std::complex<double> sc_kernel(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk, g_wk_cvt sigma_wk,
                                  mesh::imfreq wmesh_f, bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true) {
@@ -154,7 +235,8 @@ namespace triqs_tprf {
   }
 
   std::complex<double> sc_kernel(mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_w_cvt W_w, g_wk_cvt g_wk, g_w_cvt sigma_w,
-                                 mesh::imfreq wmesh_f, bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true) {
+                                 mesh::imfreq wmesh_f, bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true,
+                                 bool chiA_kernel=true, bool chiB_kernel=true) {
 
   auto Wwm = W_w.mesh();
   if (std::abs(wnval.index() - wnpval.index()) > Wwm.last_index())
@@ -185,7 +267,17 @@ namespace triqs_tprf {
     auto gamma_neg = gamma_3pnt(-wnval, -wnpval, W_w, g_w, wmesh_f);
     kernel -= W * g_g_product * (gamma_pos + gamma_neg);
   }
-  
+
+  if (chiA_kernel) {
+    auto chiA = chiA_4pnt(wnval, wnpval, W_w, g_w, wmesh_f);
+    kernel += chiA * g_g_product;
+  }
+
+  if (chiB_kernel) {
+    auto chiB = chiB_4pnt(wnval, wnpval, W_w, g_wk, wmesh_f);
+    kernel += chiB * g_g_product;
+  }
+
   if (sigma_kernel) {
     std::complex<double> g_gn_gn_product = 0.0;
     std::complex<double> g_g_gn_product = 0.0;
