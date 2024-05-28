@@ -153,6 +153,61 @@ namespace triqs_tprf {
   return kernel;
   }
 
+  std::complex<double> sc_kernel(mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_w_cvt W_w, g_wk_cvt g_wk, g_w_cvt sigma_w,
+                                 mesh::imfreq wmesh_f, bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true) {
+
+  auto Wwm = W_w.mesh();
+  if (std::abs(wnval.index() - wnpval.index()) > Wwm.last_index())
+    TRIQS_RUNTIME_ERROR << "sc_kernel: interpolating outside the Matsubara mesh of W. Please define W on a larger mesh (at least twice the inner Fermionic mesh).\n";
+
+  mesh::imfreq::value_t wnmwnpval = wnval - wnpval;
+  auto W = W_w(wnmwnpval)(0,0,0,0);
+
+  auto g_wmesh = std::get<0>(g_wk.mesh());
+  auto g_kmesh = std::get<1>(g_wk.mesh());
+  g_w_t g_w(g_wmesh, g_wk.target_shape());
+  g_w() = 0.0;
+  for (auto w : g_wmesh)
+    for (auto k : g_kmesh)
+        g_w[w] += g_wk[w,k] / g_kmesh.size();
+
+  std::complex<double> g_g_product = 0.0;
+  for (auto k : g_kmesh){
+    triqs::mesh::brzone::value_t kval = mesh::brzone::value_t{k};
+    triqs::mesh::brzone::value_t negkval = -kval;
+    g_g_product += g_wk(wnpval,kval)(0,0) * g_wk(-wnpval,negkval)(0,0) / g_kmesh.size();
+  }
+
+  std::complex<double> kernel;
+  kernel = 0;
+  if (gamma_kernel) {
+    auto gamma_pos = gamma_3pnt(wnval, wnpval, W_w, g_w, wmesh_f);
+    auto gamma_neg = gamma_3pnt(-wnval, -wnpval, W_w, g_w, wmesh_f);
+    kernel -= W * g_g_product * (gamma_pos + gamma_neg);
+  }
+  
+  if (sigma_kernel) {
+    std::complex<double> g_gn_gn_product = 0.0;
+    std::complex<double> g_g_gn_product = 0.0;
+    for (auto k : g_kmesh){
+      triqs::mesh::brzone::value_t kval = mesh::brzone::value_t{k};
+      triqs::mesh::brzone::value_t negkval = -kval;
+      g_gn_gn_product += g_wk(wnpval,kval)(0,0) * g_wk(-wnpval,negkval)(0,0) * g_wk(-wnpval,negkval)(0,0) / g_kmesh.size();
+      g_g_gn_product += g_wk(wnpval,kval)(0,0) * g_wk(wnpval,kval)(0,0) * g_wk(-wnpval,negkval)(0,0) / g_kmesh.size();
+    }
+
+    kernel -= W * sigma_w(-wnpval)(0,0) * g_gn_gn_product + W * sigma_w(wnpval)(0,0) * g_g_gn_product;
+  }
+  
+  if (oneloop_kernel)
+    kernel -= g_g_product * W;
+
+  return kernel;
+  }
+
+
+
+
 
   std::complex<double> sc_eigenvalue(g_wk_cvt delta_wk, chi_wk_cvt W_wk, g_wk_cvt g_wk, g_wk_cvt sigma_wk,
                                      bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true) {
