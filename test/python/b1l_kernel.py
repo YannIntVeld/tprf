@@ -66,7 +66,7 @@ def test_local_sc_kernel():
     for w in woutermesh_f:
         for wp in woutermesh_f:
             K_wwp.data[w.data_index,wp.data_index,0,0] = sc_kernel(w.value, wp.value, W_w, g0_wk, sigma_w,
-                                                                   woutermesh_f, True, True, True)
+                                                                   woutermesh_f, True, True, True, False, False)
 
     np.testing.assert_array_almost_equal(K_ref_wwp.data[:], K_wwp.data[:])
 
