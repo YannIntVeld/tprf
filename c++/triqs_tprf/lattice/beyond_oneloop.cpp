@@ -187,7 +187,10 @@ namespace triqs_tprf {
 
     std::complex<double> g_g_product = 0.0;
     for (auto k : g_kmesh){
-      g_g_product += g_wk[wnpp,k](0,0) * g_wk[-wnpp,-k](0,0) / g_kmesh.size();
+      //g_g_product += g_wk[wnpp,k](0,0) * g_wk[-wnpp,-k](0,0) / g_kmesh.size();
+      triqs::mesh::brzone::value_t kval = k.value();
+      triqs::mesh::brzone::value_t negkval = -k.value();
+      g_g_product += g_wk(wnppval, kval)(0,0) * g_wk(-wnppval, negkval)(0,0) / g_kmesh.size();
     }
 
     auto W1 = W_w(wnpval - wnppval)(0,0,0,0);
@@ -368,5 +371,69 @@ namespace triqs_tprf {
   eigenval = eigenval / norm;
   return eigenval;
   }
+
+
+  std::complex<double> sc_eigenvalue(g_w_cvt delta_w, chi_w_cvt W_w, g_wk_cvt g_wk, g_w_cvt sigma_w,
+                                     bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true,
+                                     bool chiA_kernel=true, bool chiB_kernel=true) {
+
+  int nb = g_wk.target().shape()[0];
+  auto Wwm = W_w.mesh();
+  auto gwm = std::get<0>(g_wk.mesh());
+
+  if (Wwm.beta() != gwm.beta())
+    TRIQS_RUNTIME_ERROR << "sc_eigenvalue: inverse temperatures are not the same.\n";
+  if (Wwm.statistic() != Boson || gwm.statistic() != Fermion)
+    TRIQS_RUNTIME_ERROR << "sc_eigenvalue: statistics are incorrect.\n";
+  if (nb != 1)
+    TRIQS_RUNTIME_ERROR << "sc_eigenvalue: not implemented for multiorbital systems.\n";
+
+  auto wmesh_f = delta_w.mesh();
+  auto kmesh = std::get<1>(g_wk.mesh());
+  auto beta = wmesh_f.beta();
+
+  std::complex<double> eigenval = 0;
+  std::complex<double> local_eigenval = 0;
+  std::complex<double> norm = 0;
+  std::complex<double> local_norm = 0;
+  
+  auto arr = mpi_view(wmesh_f);
+ 
+  #pragma omp parallel private(local_eigenval, local_norm)
+  {
+    #pragma omp parallel for
+    for (unsigned int idx = 0; idx < arr.size(); idx++) {
+      auto &wn = arr[idx];
+      auto wnval = mesh::imfreq::value_t{wn};
+      for (auto wnp : wmesh_f) {
+        auto wnpval = mesh::imfreq::value_t{wnp};
+        auto kernel = sc_kernel(wnval, wnpval, W_w, g_wk, sigma_w, wmesh_f, oneloop_kernel, gamma_kernel, sigma_kernel, chiA_kernel, chiB_kernel);
+        local_eigenval += delta_w[wn](0,0) * kernel * delta_w[wnp](0,0) / (beta * beta);
+      }
+    }
+
+    #pragma omp parallel for
+    for (unsigned int idx = 0; idx < arr.size(); idx++) {
+      auto &wn = arr[idx];
+      local_norm += delta_w[wn](0,0) * delta_w[wn](0,0) / (beta);
+    }
+
+    #pragma omp critical
+    {
+      eigenval += local_eigenval;
+      norm += local_norm;
+    }
+  }
+
+  eigenval = mpi::all_reduce(eigenval);
+  norm = mpi::all_reduce(norm);
+
+  eigenval = eigenval / norm;
+  return eigenval;
+  }
+
+
+
+
 
 } // namespace triqs_tprf
