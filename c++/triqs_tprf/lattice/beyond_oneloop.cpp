@@ -417,14 +417,12 @@ namespace triqs_tprf {
   }
 
 
-  std::complex<double> sc_eigenvalue(g_w_cvt delta_w, chi_w_cvt W_w, g_wk_cvt g_wk, g_w_cvt sigma_w,
-                                     bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true,
-                                     bool chiA_kernel=true, bool chiB_kernel=true) {
+  std::complex<double> sc_eigenvalue(g_w_cvt delta_w, chi0_cvt kernel_wwp) {
 
+  if (delta_w.mesh() != std::get<0>(kernel_wwp.mesh()) || delta_w.mesh() != std::get<1>(kernel_wwp.mesh())) 
+    TRIQS_RUNTIME_ERROR << "sc_eigenvalue: delta_w and kernel_wwp should be defined on the same meshes.\n";
 
   auto wmesh_f = delta_w.mesh();
-  auto kernel_wwp = sc_kernel(W_w, g_wk, sigma_w, wmesh_f, oneloop_kernel, gamma_kernel, sigma_kernel, chiA_kernel, chiB_kernel);
-
   auto beta = wmesh_f.beta();
 
   std::complex<double> eigenval = 0;
@@ -462,6 +460,16 @@ namespace triqs_tprf {
 
   eigenval = eigenval / norm;
   return eigenval;
+  }
+
+
+  std::complex<double> sc_eigenvalue(g_w_cvt delta_w, chi_w_cvt W_w, g_wk_cvt g_wk, g_w_cvt sigma_w,
+                                     bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true,
+                                     bool chiA_kernel=true, bool chiB_kernel=true) {
+  
+  auto wmesh_f = delta_w.mesh();
+  auto kernel_wwp = sc_kernel(W_w, g_wk, sigma_w, wmesh_f, oneloop_kernel, gamma_kernel, sigma_kernel, chiA_kernel, chiB_kernel);
+  return sc_eigenvalue(delta_w, kernel_wwp);
   }
 
 

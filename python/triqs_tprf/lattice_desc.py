@@ -1767,8 +1767,8 @@ module.add_function ("chi0_t chiB_4pnt(chi_w_cvt W_w, g_wk_cvt g_wk, mesh::imfre
 module.add_function ("std::complex<double> sc_kernel(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk, g_wk_cvt sigma_wk, mesh::imfreq wmesh_f, bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true)", doc = r"""""")
 module.add_function ("chi0_t sc_kernel(chi_w_cvt W_w, g_wk_cvt g_wk, g_w_cvt sigma_w, mesh::imfreq wmesh_f, bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true, bool chiA_kernel=true, bool chiB_kernel=true)", doc = r"""""")
 
-
 module.add_function ("std::complex<double> sc_eigenvalue(g_wk_cvt delta_wk, chi_wk_cvt W_wk, g_wk_cvt g_wk, g_wk_cvt sigma_wk, bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true)", doc = r"""""")
+module.add_function ("std::complex<double> sc_eigenvalue(g_w_cvt delta_w, chi0_cvt kernel_wwp)", doc = r"""""")
 module.add_function ("std::complex<double> sc_eigenvalue(g_w_cvt delta_w, chi_w_cvt W_w, g_wk_cvt g_wk, g_w_cvt sigma_w, bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true, bool chiA_kernel=true, bool chiB_kernel=true)", doc = r"""""")
 
 module.generate_code()
