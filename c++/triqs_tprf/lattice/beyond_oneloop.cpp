@@ -388,7 +388,7 @@ namespace triqs_tprf {
           for (auto wnp : wmesh_f) {
             auto wnpval = mesh::imfreq::value_t{wnp};
             auto kernel = sc_kernel(kval, kpval, wnval, wnpval, W_wk, g_wk, sigma_wk, wmesh_f, oneloop_kernel, gamma_kernel, sigma_kernel);
-            local_eigenval += delta_wk[wn,k](0,0) * kernel * delta_wk[wnp,kp](0,0) / (beta * beta * kmesh.size() * kmesh.size());
+            local_eigenval += delta_wk[wn,k](0,0) * kernel * nda::conj(delta_wk[wnp,kp](0,0)) / (beta * beta * kmesh.size() * kmesh.size());
           }
         }
       }
@@ -398,7 +398,7 @@ namespace triqs_tprf {
     for (unsigned int idx = 0; idx < arr.size(); idx++) {
       auto &k  = arr[idx];
       for (auto wn : wmesh_f) {
-        local_norm += delta_wk[wn,k](0,0) * delta_wk[wn,k](0,0) / (beta * kmesh.size());
+        local_norm += delta_wk[wn,k](0,0) * nda::conj(delta_wk[wn,k](0,0)) / (beta * kmesh.size());
       }
     }
 
@@ -438,14 +438,14 @@ namespace triqs_tprf {
     for (unsigned int idx = 0; idx < arr.size(); idx++) {
       auto &wn = arr[idx];
       for (auto wnp : wmesh_f) {
-        local_eigenval += delta_w[wn](0,0) * kernel_wwp[wn,wnp](0,0,0,0) * delta_w[wnp](0,0) / (beta * beta);
+        local_eigenval += delta_w[wn](0,0) * kernel_wwp[wn,wnp](0,0,0,0) * nda::conj(delta_w[wnp](0,0)) / (beta * beta);
       }
     }
 
     #pragma omp parallel for
     for (unsigned int idx = 0; idx < arr.size(); idx++) {
       auto &wn = arr[idx];
-      local_norm += delta_w[wn](0,0) * delta_w[wn](0,0) / (beta);
+      local_norm += delta_w[wn](0,0) * nda::conj(delta_w[wn](0,0)) / (beta);
     }
 
     #pragma omp critical
