@@ -34,55 +34,44 @@
 
 namespace triqs_tprf {
 
-  std::complex<double> gamma_3pnt(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk, mesh::imfreq wmesh_f) {
 
-  int nb = g_wk.target().shape()[0];
-  auto Wwm = std::get<0>(W_wk.mesh());
-  auto gwm = std::get<0>(g_wk.mesh());
 
-  if (Wwm.beta() != gwm.beta() || wmesh_f.beta() != gwm.beta())
-    TRIQS_RUNTIME_ERROR << "gamma_3pnt: inverse temperatures are not the same.\n";
-  if (Wwm.statistic() != Boson || gwm.statistic() != Fermion || wmesh_f.statistic() != Fermion)
-    TRIQS_RUNTIME_ERROR << "gamma_3pnt: statistics are incorrect.\n";
-  if (std::get<1>(W_wk.mesh()) != std::get<1>(g_wk.mesh()))
-    TRIQS_RUNTIME_ERROR << "gamma_3pnt: k-space meshes are not the same.\n";
-  if (nb != 1)
-    TRIQS_RUNTIME_ERROR << "gamma_3pnt: not implemented for multiorbital systems.\n";
-  //if (2 *std::abs(wnval.index()) > Wwm.last_index())
-  //  TRIQS_RUNTIME_ERROR << "gamma_3pnt: interpolating outside the Matsubara mesh of W. Please define W on a larger mesh (at least twice the inner Fermionic mesh).\n";
-  //if (std::abs(wnpval.index()) + std::abs(wnval.index()) > wmesh_f.last_index())
-  //  TRIQS_RUNTIME_ERROR << "gamma_3pnt: interpolating outside the Matsubara mesh of G. Please define G on a larger mesh (at least thrice the inner Fermionic mesh).\n";
 
-  auto kmesh = std::get<1>(g_wk.mesh());
-  auto _  = all_t{};
-
-  std::complex<double> gamma;
-  gamma = 0.0;
-
-  for (auto kpp : kmesh){
-    auto kppval = mesh::brzone::value_t{kpp};
-    triqs::mesh::brzone::value_t kmkppval = kval - kppval;
-    triqs::mesh::brzone::value_t kpmkpkppval = kpval - kval + kppval;
-
-    // Interpolating w and k at the same time gives incorrect result for some reason?
-    auto W_w =  W_wk(_, kmkppval);
-    auto g1_w = g_wk(_,kppval);
-    auto g2_w = g_wk(_,kpmkpkppval);
-
-    g_w_t integrant_w(wmesh_f, g_wk.target_shape());
-    for (auto wpp : wmesh_f) {
-      auto wnppval = mesh::imfreq::value_t{wpp};
-      triqs::mesh::imfreq::value_t wnmwnppval = wnval - wnppval;
-      triqs::mesh::imfreq::value_t wnpmwnpwnpp = wnpval - wnval + wnppval;
-      integrant_w[wpp] = - W_w(wnmwnppval)(0,0,0,0) * g1_w(wnppval) * g2_w(wnpmwnpwnpp);
+  template<typename g_t, typename gk_cvt>
+  std::tuple<g_t,g_t,g_t,g_t> localized_gfs_for_sc_impl(gk_cvt g_wk) { 
+    auto [g_wmesh, g_kmesh] = g_wk.mesh();
+    auto Nk = g_kmesh.size();
+    g_t g_w(g_wmesh, g_wk.target_shape());
+    g_w() = 0.0;
+    g_t g_g_w(g_wmesh, g_wk.target_shape());
+    g_g_w() = 0.0;
+    g_t g_gn_gn_w(g_wmesh, g_wk.target_shape());
+    g_gn_gn_w() = 0.0;
+    g_t g_g_gn_w(g_wmesh, g_wk.target_shape());
+    g_g_gn_w() = 0.0;
+ 
+    auto arr_g = mpi_view(g_wk.mesh());
+    #pragma omp parallel for
+    for (int idx = 0; idx < arr_g.size(); idx++) {
+      auto &[w,k] = arr_g[idx];
+      g_w[w] += g_wk[w,k] / Nk;
+      g_g_w[w] += g_wk[w,k] * nda::conj(g_wk[w,-k]) / Nk;
+      g_gn_gn_w[w] += g_wk[w,k] * nda::conj(g_wk[w,-k]) * nda::conj(g_wk[w,-k]) / Nk;
+      g_g_gn_w[w] += g_wk[w,k] * g_wk[w,k] * nda::conj(g_wk[w,-k]) / Nk;
     }
-    auto integrant_t = make_gf_from_fourier(integrant_w);
+    g_w = mpi::all_reduce(g_w);
+    g_g_w = mpi::all_reduce(g_g_w);
+    g_gn_gn_w = mpi::all_reduce(g_gn_gn_w);
+    g_g_gn_w = mpi::all_reduce(g_g_gn_w);
 
-    gamma += integrant_t(0.0)(0,0);
+    return {g_w, g_g_w, g_gn_gn_w, g_g_gn_w};
   }
 
-  gamma = gamma / (kmesh.size());
-  return gamma;
+  std::tuple<g_w_t,g_w_t,g_w_t,g_w_t> localized_gfs_for_sc(g_wk_cvt g_wk) { 
+    return localized_gfs_for_sc_impl<g_w_t,g_wk_cvt>(g_wk);
+  }
+  std::tuple<g_Dw_t,g_Dw_t,g_Dw_t,g_Dw_t> localized_gfs_for_sc(g_Dwk_cvt g_wk) { 
+    return localized_gfs_for_sc_impl<g_Dw_t,g_Dwk_cvt>(g_wk);
   }
 
 
@@ -213,20 +202,7 @@ namespace triqs_tprf {
   return chi;
   }
 
-  chi0_t chiB_4pnt(chi_w_cvt W_w, g_wk_cvt g_wk, mesh::imfreq wmesh_f) {
-
-    g_w_t g_g_w(std::get<0>(g_wk.mesh()), g_wk.target_shape());
-    g_g_w() = 0.0;
-    auto Nk = std::get<1>(g_wk.mesh()).size();
- 
-    auto arr_g = mpi_view(g_wk.mesh());
-    #pragma omp parallel for
-    for (int idx = 0; idx < arr_g.size(); idx++) {
-      auto &[w,k] = arr_g[idx];
-      g_g_w[w] += g_wk[w,k] * g_wk[-w,-k] / Nk;
-    }
-    g_g_w = mpi::all_reduce(g_g_w);
-
+  chi0_t chiB_4pnt(chi_w_cvt W_w, g_w_cvt g_g_w, mesh::imfreq wmesh_f) {
 
     chi0_t chi_wwp({wmesh_f, wmesh_f}, W_w.target_shape());
     chi_wwp() = 0.0;
@@ -235,7 +211,7 @@ namespace triqs_tprf {
     #pragma omp parallel for
     for (int idx = 0; idx < arr.size(); idx++) {
       auto &[w, wp] = arr[idx];
-      chi_wwp[w,wp](0,0,0,0) += chiB_4pnt(w.value(), wp.value(), W_w, g_g_w, std::get<0>(g_wk.mesh()));
+      chi_wwp[w,wp](0,0,0,0) += chiB_4pnt(w.value(), wp.value(), W_w, g_g_w, g_g_w.mesh());
     }
 
     chi_wwp = mpi::all_reduce(chi_wwp);
@@ -243,6 +219,191 @@ namespace triqs_tprf {
   }
 
 
+  chi0_t sc_kernel_oneloop(chi_w_cvt W_w, g_w_cvt g_g_w, mesh::imfreq wmesh_f) {
+
+    chi0_t kernel_wwp({wmesh_f, wmesh_f}, W_w.target_shape());
+    kernel_wwp() = 0.0;
+
+    auto arr = mpi_view(kernel_wwp.mesh());
+    #pragma omp parallel for
+    for (int idx = 0; idx < arr.size(); idx++) {
+      auto &[w, wp] = arr[idx];
+      kernel_wwp[w,wp] += - W_w(w-wp) * g_g_w(wp)(0,0);
+    }
+
+    kernel_wwp = mpi::all_reduce(kernel_wwp);
+    return kernel_wwp;
+  }
+
+  chi0_t sc_kernel_gamma(chi_w_cvt W_w, chi0_cvt gamma_wwp, g_w_cvt g_g_w, mesh::imfreq wmesh_f) {
+
+    chi0_t kernel_wwp({wmesh_f, wmesh_f}, W_w.target_shape());
+    kernel_wwp() = 0.0;
+
+    auto arr = mpi_view(kernel_wwp.mesh());
+    #pragma omp parallel for
+    for (int idx = 0; idx < arr.size(); idx++) {
+      auto &[w, wp] = arr[idx];
+      kernel_wwp[w,wp] += - W_w(w-wp) * (gamma_wwp(w,wp) + gamma_wwp(-w,-wp)) * g_g_w(wp)(0,0);
+    }
+
+    kernel_wwp = mpi::all_reduce(kernel_wwp);
+    return kernel_wwp;
+  }
+
+  chi0_t sc_kernel_sigma(chi_w_cvt W_w, g_w_cvt sigma_w, g_w_cvt g_gn_gn_w, g_w_cvt g_g_gn_w, mesh::imfreq wmesh_f) {
+
+    chi0_t kernel_wwp({wmesh_f, wmesh_f}, W_w.target_shape());
+    kernel_wwp() = 0.0;
+
+    auto arr = mpi_view(kernel_wwp.mesh());
+    #pragma omp parallel for
+    for (int idx = 0; idx < arr.size(); idx++) {
+      auto &[w, wp] = arr[idx];
+      kernel_wwp[w,wp] += - W_w(w-wp) * sigma_w(-wp)(0,0) * g_gn_gn_w(wp)(0,0);
+      kernel_wwp[w,wp] += - W_w(w-wp) * sigma_w(wp)(0,0) * g_g_gn_w(wp)(0,0);
+    }
+
+    kernel_wwp = mpi::all_reduce(kernel_wwp);
+    return kernel_wwp;
+  }
+
+  chi0_t sc_kernel_chiA(chi0_cvt chiA_wwp, g_w_cvt g_g_w, mesh::imfreq wmesh_f) {
+
+    chi0_t kernel_wwp({wmesh_f, wmesh_f}, chiA_wwp.target_shape());
+    kernel_wwp() = 0.0;
+
+    auto arr = mpi_view(kernel_wwp.mesh());
+    #pragma omp parallel for
+    for (int idx = 0; idx < arr.size(); idx++) {
+      auto &[w, wp] = arr[idx];
+      kernel_wwp[w,wp] += chiA_wwp(w,wp) * g_g_w(wp)(0,0);
+    }
+
+    kernel_wwp = mpi::all_reduce(kernel_wwp);
+    return kernel_wwp;
+  }
+
+  chi0_t sc_kernel_chiB(chi0_cvt chiB_wwp, g_w_cvt g_g_w, mesh::imfreq wmesh_f) {
+
+    chi0_t kernel_wwp({wmesh_f, wmesh_f}, chiB_wwp.target_shape());
+    kernel_wwp() = 0.0;
+
+    auto arr = mpi_view(kernel_wwp.mesh());
+    #pragma omp parallel for
+    for (int idx = 0; idx < arr.size(); idx++) {
+      auto &[w, wp] = arr[idx];
+      kernel_wwp[w,wp] += chiB_wwp(w,wp) * g_g_w(wp)(0,0);
+    }
+
+    kernel_wwp = mpi::all_reduce(kernel_wwp);
+    return kernel_wwp;
+  }
+
+
+  std::complex<double> sc_eigenvalue(g_w_cvt delta_w, chi0_cvt kernel_wwp) {
+
+  if (delta_w.mesh() != std::get<0>(kernel_wwp.mesh()) || delta_w.mesh() != std::get<1>(kernel_wwp.mesh())) 
+    TRIQS_RUNTIME_ERROR << "sc_eigenvalue: delta_w and kernel_wwp should be defined on the same meshes.\n";
+
+  auto wmesh_f = delta_w.mesh();
+  auto beta = wmesh_f.beta();
+
+  std::complex<double> eigenval = 0;
+  std::complex<double> local_eigenval = 0;
+  std::complex<double> norm = 0;
+  std::complex<double> local_norm = 0;
+  
+  auto arr = mpi_view(wmesh_f);
+ 
+  #pragma omp parallel private(local_eigenval, local_norm)
+  {
+    #pragma omp parallel for
+    for (unsigned int idx = 0; idx < arr.size(); idx++) {
+      auto &wn = arr[idx];
+      for (auto wnp : wmesh_f) {
+        local_eigenval += delta_w[wn](0,0) * kernel_wwp[wn,wnp](0,0,0,0) * nda::conj(delta_w[wnp](0,0)) / (beta * beta);
+      }
+    }
+
+    #pragma omp parallel for
+    for (unsigned int idx = 0; idx < arr.size(); idx++) {
+      auto &wn = arr[idx];
+      local_norm += delta_w[wn](0,0) * nda::conj(delta_w[wn](0,0)) / (beta);
+    }
+
+    #pragma omp critical
+    {
+      eigenval += local_eigenval;
+      norm += local_norm;
+    }
+  }
+
+  eigenval = mpi::all_reduce(eigenval);
+  norm = mpi::all_reduce(norm);
+
+  eigenval = eigenval / norm;
+  return eigenval;
+  }
+
+
+
+
+
+// ============================
+// Non-local vertices
+// ============================
+
+  std::complex<double> gamma_3pnt(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk, mesh::imfreq wmesh_f) {
+
+  int nb = g_wk.target().shape()[0];
+  auto Wwm = std::get<0>(W_wk.mesh());
+  auto gwm = std::get<0>(g_wk.mesh());
+
+  if (Wwm.beta() != gwm.beta() || wmesh_f.beta() != gwm.beta())
+    TRIQS_RUNTIME_ERROR << "gamma_3pnt: inverse temperatures are not the same.\n";
+  if (Wwm.statistic() != Boson || gwm.statistic() != Fermion || wmesh_f.statistic() != Fermion)
+    TRIQS_RUNTIME_ERROR << "gamma_3pnt: statistics are incorrect.\n";
+  if (std::get<1>(W_wk.mesh()) != std::get<1>(g_wk.mesh()))
+    TRIQS_RUNTIME_ERROR << "gamma_3pnt: k-space meshes are not the same.\n";
+  if (nb != 1)
+    TRIQS_RUNTIME_ERROR << "gamma_3pnt: not implemented for multiorbital systems.\n";
+  //if (2 *std::abs(wnval.index()) > Wwm.last_index())
+  //  TRIQS_RUNTIME_ERROR << "gamma_3pnt: interpolating outside the Matsubara mesh of W. Please define W on a larger mesh (at least twice the inner Fermionic mesh).\n";
+  //if (std::abs(wnpval.index()) + std::abs(wnval.index()) > wmesh_f.last_index())
+  //  TRIQS_RUNTIME_ERROR << "gamma_3pnt: interpolating outside the Matsubara mesh of G. Please define G on a larger mesh (at least thrice the inner Fermionic mesh).\n";
+
+  auto kmesh = std::get<1>(g_wk.mesh());
+  auto _  = all_t{};
+
+  std::complex<double> gamma;
+  gamma = 0.0;
+
+  for (auto kpp : kmesh){
+    auto kppval = mesh::brzone::value_t{kpp};
+    triqs::mesh::brzone::value_t kmkppval = kval - kppval;
+    triqs::mesh::brzone::value_t kpmkpkppval = kpval - kval + kppval;
+
+    // Interpolating w and k at the same time gives incorrect result for some reason?
+    auto W_w =  W_wk(_, kmkppval);
+    auto g1_w = g_wk(_,kppval);
+    auto g2_w = g_wk(_,kpmkpkppval);
+
+    g_w_t integrant_w(wmesh_f, g_wk.target_shape());
+    for (auto wpp : wmesh_f) {
+      auto wnppval = mesh::imfreq::value_t{wpp};
+      triqs::mesh::imfreq::value_t wnmwnppval = wnval - wnppval;
+      triqs::mesh::imfreq::value_t wnpmwnpwnpp = wnpval - wnval + wnppval;
+      integrant_w[wpp] = - W_w(wnmwnppval)(0,0,0,0) * g1_w(wnppval) * g2_w(wnpmwnpwnpp);
+    }
+    auto integrant_t = make_gf_from_fourier(integrant_w);
+
+    gamma += integrant_t(0.0)(0,0);
+  }
+
+  gamma = gamma / (kmesh.size());
+  return gamma;
+  }
 
   std::complex<double> sc_kernel(mesh::brzone::value_t kval, triqs::mesh::brzone::value_t kpval, mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_wk_cvt W_wk, g_wk_cvt g_wk, g_wk_cvt sigma_wk,
                                  mesh::imfreq wmesh_f, bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true) {
@@ -277,77 +438,6 @@ namespace triqs_tprf {
   }
 
 
-  chi0_t sc_kernel(chi_w_cvt W_w, g_wk_cvt g_wk, g_w_cvt sigma_w, mesh::imfreq wmesh_f,
-                   bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true,
-                   bool chiA_kernel=true, bool chiB_kernel=true) {
-
-  auto [g_wmesh, g_kmesh] = g_wk.mesh();
-  auto Nk = g_kmesh.size();
-  g_w_t g_w(g_wmesh, g_wk.target_shape());
-  g_w() = 0.0;
-  g_w_t g_g_w(g_wmesh, g_wk.target_shape());
-  g_g_w() = 0.0;
-  g_w_t g_gn_gn_w(g_wmesh, g_wk.target_shape());
-  g_gn_gn_w() = 0.0;
-  g_w_t g_g_gn_w(g_wmesh, g_wk.target_shape());
-  g_g_gn_w() = 0.0;
- 
-  auto arr_g = mpi_view(g_wk.mesh());
-  #pragma omp parallel for
-  for (int idx = 0; idx < arr_g.size(); idx++) {
-    auto &[w,k] = arr_g[idx];
-    g_w[w] += g_wk[w,k] / Nk;
-    g_g_w[w] += g_wk[w,k] * g_wk[-w,-k] / Nk;
-    g_gn_gn_w[w] += g_wk[w,k] * g_wk[-w,-k] * g_wk[-w,-k] / Nk;
-    g_g_gn_w[w] += g_wk[w,k] * g_wk[w,k] * g_wk[-w,-k] / Nk;
-  }
-  g_w = mpi::all_reduce(g_w);
-  g_g_w = mpi::all_reduce(g_g_w);
-  g_gn_gn_w = mpi::all_reduce(g_gn_gn_w);
-  g_g_gn_w = mpi::all_reduce(g_g_gn_w);
-
-
-  chi0_t gamma_wwp, chiA_wwp, chiB_wwp;
-  if (gamma_kernel)
-    gamma_wwp = gamma_3pnt(W_w, g_w, wmesh_f);
-  if (chiA_kernel)
-    chiA_wwp = chiA_4pnt(W_w, g_w, wmesh_f);
-  if (chiB_kernel)
-    chiB_wwp = chiB_4pnt(W_w, g_wk, wmesh_f);
-
-
-  chi0_t kernel_wwp({wmesh_f, wmesh_f}, W_w.target_shape());
-  kernel_wwp() = 0.0;
-
-  auto arr = mpi_view(kernel_wwp.mesh());
-  #pragma omp parallel for
-  for (int idx = 0; idx < arr.size(); idx++) {
-    auto &[w, wp] = arr[idx];
-
-    if (oneloop_kernel) {
-      kernel_wwp[w,wp] += - W_w(w-wp) * g_g_w(wp)(0,0);
-    }
-    if (gamma_kernel) {
-      kernel_wwp[w,wp] += - W_w(w-wp) * (gamma_wwp(w,wp) + gamma_wwp(-w,-wp)) * g_g_w(wp)(0,0);
-    }
-    if (sigma_kernel) {
-      kernel_wwp[w,wp] += - W_w(w-wp) * sigma_w(-wp)(0,0) * g_gn_gn_w(wp)(0,0);
-      kernel_wwp[w,wp] += - W_w(w-wp) * sigma_w(wp)(0,0) * g_g_gn_w(wp)(0,0);
-    }
-    if (chiA_kernel) {
-      kernel_wwp[w,wp] += chiA_wwp(w,wp) * g_g_w(wp)(0,0);
-    }
-    if (chiB_kernel) {
-      kernel_wwp[w,wp] += chiB_wwp(w,wp) * g_g_w(wp)(0,0);
-    }
-  }
-
-  kernel_wwp = mpi::all_reduce(kernel_wwp);
-  return kernel_wwp;
-  }
-
-  
-  
   std::complex<double> sc_eigenvalue(g_wk_cvt delta_wk, chi_wk_cvt W_wk, g_wk_cvt g_wk, g_wk_cvt sigma_wk,
                                      bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true) {
 
@@ -416,61 +506,6 @@ namespace triqs_tprf {
   return eigenval;
   }
 
-
-  std::complex<double> sc_eigenvalue(g_w_cvt delta_w, chi0_cvt kernel_wwp) {
-
-  if (delta_w.mesh() != std::get<0>(kernel_wwp.mesh()) || delta_w.mesh() != std::get<1>(kernel_wwp.mesh())) 
-    TRIQS_RUNTIME_ERROR << "sc_eigenvalue: delta_w and kernel_wwp should be defined on the same meshes.\n";
-
-  auto wmesh_f = delta_w.mesh();
-  auto beta = wmesh_f.beta();
-
-  std::complex<double> eigenval = 0;
-  std::complex<double> local_eigenval = 0;
-  std::complex<double> norm = 0;
-  std::complex<double> local_norm = 0;
-  
-  auto arr = mpi_view(wmesh_f);
- 
-  #pragma omp parallel private(local_eigenval, local_norm)
-  {
-    #pragma omp parallel for
-    for (unsigned int idx = 0; idx < arr.size(); idx++) {
-      auto &wn = arr[idx];
-      for (auto wnp : wmesh_f) {
-        local_eigenval += delta_w[wn](0,0) * kernel_wwp[wn,wnp](0,0,0,0) * nda::conj(delta_w[wnp](0,0)) / (beta * beta);
-      }
-    }
-
-    #pragma omp parallel for
-    for (unsigned int idx = 0; idx < arr.size(); idx++) {
-      auto &wn = arr[idx];
-      local_norm += delta_w[wn](0,0) * nda::conj(delta_w[wn](0,0)) / (beta);
-    }
-
-    #pragma omp critical
-    {
-      eigenval += local_eigenval;
-      norm += local_norm;
-    }
-  }
-
-  eigenval = mpi::all_reduce(eigenval);
-  norm = mpi::all_reduce(norm);
-
-  eigenval = eigenval / norm;
-  return eigenval;
-  }
-
-
-  std::complex<double> sc_eigenvalue(g_w_cvt delta_w, chi_w_cvt W_w, g_wk_cvt g_wk, g_w_cvt sigma_w,
-                                     bool oneloop_kernel=true, bool gamma_kernel=true, bool sigma_kernel=true,
-                                     bool chiA_kernel=true, bool chiB_kernel=true) {
-  
-  auto wmesh_f = delta_w.mesh();
-  auto kernel_wwp = sc_kernel(W_w, g_wk, sigma_w, wmesh_f, oneloop_kernel, gamma_kernel, sigma_kernel, chiA_kernel, chiB_kernel);
-  return sc_eigenvalue(delta_w, kernel_wwp);
-  }
 
 
 
