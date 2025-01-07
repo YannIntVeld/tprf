@@ -28,6 +28,8 @@ namespace triqs_tprf {
 // Local vertices
   std::tuple<g_w_t,g_w_t,g_w_t,g_w_t> localized_gfs_for_sc(g_wk_cvt g_wk);
   std::tuple<g_Dw_t,g_Dw_t,g_Dw_t,g_Dw_t> localized_gfs_for_sc(g_Dwk_cvt g_wk);
+  std::tuple<g_w_t,g_w_t,g_w_t,g_w_t> localized_gfs_for_sc(double mu, e_k_cvt e_k, mesh::imfreq wmesh);
+  std::tuple<g_Dw_t,g_Dw_t,g_Dw_t,g_Dw_t> localized_gfs_for_sc(double mu, e_k_cvt e_k, mesh::dlr_imfreq wmesh);
 
   std::complex<double> gamma_3pnt(mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_w_cvt W_w, g_w_cvt g_w, mesh::imfreq wmesh_f);
   chi0_t gamma_3pnt(chi_w_cvt W_w, g_w_cvt g_w, mesh::imfreq wmesh_f);

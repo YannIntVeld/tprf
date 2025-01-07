@@ -75,6 +75,54 @@ namespace triqs_tprf {
   }
 
 
+
+  template<typename g_t, typename wmesh_t>
+  std::tuple<g_t,g_t,g_t,g_t> localized_gfs_for_sc_impl(double mu, e_k_cvt e_k, wmesh_t wmesh) { 
+    auto kmesh = e_k.mesh();
+    auto Nk = kmesh.size();
+    using scalar_t = e_k_cvt::scalar_t;
+    auto I = nda::eye<scalar_t>(e_k.target_shape()[0]);
+
+    g_t g_w(wmesh, e_k.target_shape());
+    g_w() = 0.0;
+    g_t g_g_w(wmesh, e_k.target_shape());
+    g_g_w() = 0.0;
+    g_t g_gn_gn_w(wmesh, e_k.target_shape());
+    g_gn_gn_w() = 0.0;
+    g_t g_g_gn_w(wmesh, e_k.target_shape());
+    g_g_gn_w() = 0.0;
+ 
+    auto arr = mpi_view(wmesh);
+    #pragma omp parallel for
+    for (int idx = 0; idx < arr.size(); idx++) {
+      auto &w = arr[idx];
+
+      for (auto k: kmesh) {
+        auto g_pos = inverse((w + mu)*I - e_k[k]);
+        auto g_neg = inverse((-w + mu)*I - e_k[-k]);
+
+        g_w[w] += g_pos / Nk;
+        g_g_w[w] += g_pos * g_neg / Nk;
+        g_gn_gn_w[w] += g_pos * g_neg * g_neg / Nk;
+        g_g_gn_w[w] += g_pos * g_pos * g_neg / Nk;
+      }
+    }
+    g_w = mpi::all_reduce(g_w);
+    g_g_w = mpi::all_reduce(g_g_w);
+    g_gn_gn_w = mpi::all_reduce(g_gn_gn_w);
+    g_g_gn_w = mpi::all_reduce(g_g_gn_w);
+
+    return {g_w, g_g_w, g_gn_gn_w, g_g_gn_w};
+  }
+  std::tuple<g_w_t,g_w_t,g_w_t,g_w_t> localized_gfs_for_sc(double mu, e_k_cvt e_k, mesh::imfreq wmesh) { 
+    return localized_gfs_for_sc_impl<g_w_t,mesh::imfreq>(mu, e_k, wmesh);
+  }
+  std::tuple<g_Dw_t,g_Dw_t,g_Dw_t,g_Dw_t> localized_gfs_for_sc(double mu, e_k_cvt e_k, mesh::dlr_imfreq wmesh) { 
+    return localized_gfs_for_sc_impl<g_Dw_t,mesh::dlr_imfreq>(mu, e_k, wmesh);
+  }
+
+
+
   std::complex<double> gamma_3pnt(mesh::imfreq::value_t wnval, mesh::imfreq::value_t wnpval, chi_w_cvt W_w, g_w_cvt g_w, mesh::imfreq wmesh_f) {
 
   int nb = g_w.target().shape()[0];
